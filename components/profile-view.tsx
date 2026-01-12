@@ -27,6 +27,12 @@ import {
   getUserProfileClient,
 } from '@/lib/user-service'
 import { useAuth } from '@/components/auth-provider'
+// 1. Add these imports at the top
+import { Share2, Check, Copy, Globe } from 'lucide-react'
+import {
+  checkUsernameAvailable,
+  generateUsername,
+} from '@/lib/public-profile-service'
 
 interface ProfileViewProps {
   userId: string
@@ -58,6 +64,8 @@ export default function ProfileView({
 
   const [formData, setFormData] = useState({
     full_name: '',
+    username: '',
+
     bio: '',
     instagram_url: '',
     twitter_url: '',
@@ -65,6 +73,39 @@ export default function ProfileView({
   })
 
   const [profilePicture, setProfilePicture] = useState<string | null>(null)
+
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [shareUrlCopied, setShareUrlCopied] = useState(false)
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(
+    null
+  )
+  const [checkingUsername, setCheckingUsername] = useState(false)
+
+  useEffect(() => {
+    const checkUsername = async () => {
+      if (!formData.username || formData.username === userProfile.username) {
+        setUsernameAvailable(null)
+        return
+      }
+
+      setCheckingUsername(true)
+      try {
+        const available = await checkUsernameAvailable(
+          formData.username,
+          userId
+        )
+        setUsernameAvailable(available)
+      } catch (error) {
+        console.error('Error checking username:', error)
+        setUsernameAvailable(null)
+      } finally {
+        setCheckingUsername(false)
+      }
+    }
+
+    const timer = setTimeout(checkUsername, 500)
+    return () => clearTimeout(timer)
+  }, [formData.username, userProfile.username, userId])
 
   // Fetch user profile
   useEffect(() => {
@@ -79,6 +120,7 @@ export default function ProfileView({
           setUserProfile(profile)
           setFormData({
             full_name: profile.full_name || '',
+            username: profile.username || '',
             bio: profile.bio || '',
             instagram_url: profile.instagram_url || '',
             twitter_url: profile.twitter_url || '',
@@ -88,11 +130,12 @@ export default function ProfileView({
         } else {
           // Profile doesn't exist yet - will be created on first save
           setFormData({
-            full_name: '',
-            bio: '',
-            instagram_url: '',
-            twitter_url: '',
-            other_link: '',
+            full_name: profile.full_name || '',
+            username: profile.username || '',
+            bio: profile.bio || '',
+            instagram_url: profile.instagram_url || '',
+            twitter_url: profile.twitter_url || '',
+            other_link: profile.other_link || '',
           })
         }
       } catch (err) {
@@ -119,6 +162,28 @@ export default function ProfileView({
     }
   }
 
+  // 6. Add function to generate username
+  const handleGenerateUsername = async () => {
+    const generated = await generateUsername(formData.full_name || 'user')
+    setFormData({ ...formData, username: generated })
+  }
+
+  // 7. Add function to handle profile sharing
+  const handleShareProfile = () => {
+    if (!userProfile.username) {
+      setError('Please set a username first to share your profile')
+      setTimeout(() => setError(null), 3000)
+      return
+    }
+    setShowShareModal(true)
+  }
+
+  const copyShareUrl = async () => {
+    const url = `${window.location.origin}/u/${userProfile.username}`
+    await navigator.clipboard.writeText(url)
+    setShareUrlCopied(true)
+    setTimeout(() => setShareUrlCopied(false), 2000)
+  }
   const handleProfilePictureChange = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -210,8 +275,36 @@ export default function ProfileView({
         return
       }
 
+      // Validate username if changed
+      if (formData.username !== userProfile.username) {
+        if (!formData.username.trim()) {
+          setError('Username is required for public profile')
+          setIsSaving(false)
+          return
+        }
+
+        if (!/^[a-z0-9_]+$/.test(formData.username)) {
+          setError(
+            'Username can only contain lowercase letters, numbers, and underscores'
+          )
+          setIsSaving(false)
+          return
+        }
+
+        const available = await checkUsernameAvailable(
+          formData.username,
+          userId
+        )
+        if (!available) {
+          setError('Username is already taken')
+          setIsSaving(false)
+          return
+        }
+      }
+
       const updateData: any = {
         full_name: formData.full_name.trim(),
+        username: formData.username.trim() || null,
         bio: formData.bio.trim() || null,
         instagram_url: formData.instagram_url.trim() || null,
         twitter_url: formData.twitter_url.trim() || null,
@@ -236,15 +329,15 @@ export default function ProfileView({
       setIsSaving(false)
     }
   }
-
   const handleCancel = () => {
     setIsEditing(false)
     setFormData({
-      full_name: userProfile.full_name || '',
-      bio: userProfile.bio || '',
-      instagram_url: userProfile.instagram_url || '',
-      twitter_url: userProfile.twitter_url || '',
-      other_link: userProfile.other_link || '',
+      full_name: profile.full_name || '',
+      username: profile.username || '',
+      bio: profile.bio || '',
+      instagram_url: profile.instagram_url || '',
+      twitter_url: profile.twitter_url || '',
+      other_link: profile.other_link || '',
     })
     setError(null)
   }
@@ -299,6 +392,51 @@ export default function ProfileView({
         </h1>
       </div>
 
+      {userProfile.username && (
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg shadow-md p-6 mb-6 border-2 border-blue-200">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h3
+                className="text-lg font-bold mb-2"
+                style={{ color: '#5f462d' }}
+              >
+                <Globe className="w-5 h-5 inline mr-2" />
+                Share Your Profile
+              </h3>
+              <p className="text-sm text-gray-600 mb-3">
+                Your public profile URL (share via email, SMS, or social media)
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 bg-white px-4 py-3 rounded-lg border-2 border-gray-300 font-mono text-sm">
+                  {`${
+                    typeof window !== 'undefined' ? window.location.origin : ''
+                  }/u/${userProfile.username}`}
+                </div>
+                <button
+                  onClick={copyShareUrl}
+                  className="px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-2"
+                  style={{
+                    background: shareUrlCopied ? '#22c55e' : '#5f462d',
+                    color: 'white',
+                  }}
+                >
+                  {shareUrlCopied ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      Copy
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Messages */}
       {error && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex justify-between items-center">
@@ -486,7 +624,7 @@ export default function ProfileView({
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Username
+                    Full name
                   </label>
                   <div className="relative">
                     <User className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
@@ -504,6 +642,71 @@ export default function ProfileView({
                       required
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Username (for public profile)
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={formData.username}
+                      onChange={(e) => {
+                        const value = e.target.value
+                          .toLowerCase()
+                          .replace(/[^a-z0-9_]/g, '')
+                          .substring(0, 30)
+                        setFormData({ ...formData, username: value })
+                      }}
+                      className={`w-full pl-10 pr-4 py-2 border-2 rounded-lg focus:ring-2 focus:outline-none ${
+                        checkingUsername
+                          ? 'border-gray-300'
+                          : usernameAvailable === true
+                          ? 'border-green-500 focus:ring-green-500'
+                          : usernameAvailable === false
+                          ? 'border-red-500 focus:ring-red-500'
+                          : 'border-gray-300 focus:ring-blue-500'
+                      }`}
+                      placeholder="your_username"
+                      pattern="[a-z0-9_]+"
+                    />
+                    {checkingUsername && (
+                      <div className="absolute right-3 top-3">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600" />
+                      </div>
+                    )}
+                    {!checkingUsername && usernameAvailable === true && (
+                      <Check className="absolute right-3 top-3 w-4 h-4 text-green-600" />
+                    )}
+                    {!checkingUsername && usernameAvailable === false && (
+                      <X className="absolute right-3 top-3 w-4 h-4 text-red-600" />
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <p className="text-xs text-gray-500">
+                      {usernameAvailable === false
+                        ? '❌ Username already taken'
+                        : usernameAvailable === true
+                        ? '✅ Username available'
+                        : 'Only lowercase letters, numbers, and underscores'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleGenerateUsername}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      Generate from name
+                    </button>
+                  </div>
+                  {formData.username && (
+                    <p className="text-xs text-gray-600 mt-2 flex items-center gap-1">
+                      <Globe className="w-3 h-3" />
+                      Your profile will be available at:{' '}
+                      <span className="font-mono">/u/{formData.username}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div>

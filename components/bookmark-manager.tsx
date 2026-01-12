@@ -38,6 +38,7 @@ export default function BookmarkManager() {
     shareCategory,
     reorderCategories,
     setSelectedEmoji,
+    toggleCategoryVisibility, // ← ADD THIS LINE
   } = useBookmarkManagerHybrid({
     userId: dbUser?.id,
     onSyncBookmark: dbUser?.id
@@ -329,6 +330,7 @@ export default function BookmarkManager() {
             onReorderCategories={reorderCategories}
             editingCategory={editingCategory}
             onUpdateCategory={updateCategory}
+            onToggleVisibility={toggleCategoryVisibility} // ADD THIS LINE
           />
         </div>
       </main>
@@ -345,6 +347,11 @@ export default function BookmarkManager() {
         selectedEmoji={selectedEmoji}
         onEmojiSelect={setSelectedEmoji}
         editingCategory={editingCategory}
+        currentIsPublic={
+          editingCategory
+            ? bookmarkData.categoryPublicStatus[editingCategory] || false
+            : false
+        }
       />
 
       <ShareModal

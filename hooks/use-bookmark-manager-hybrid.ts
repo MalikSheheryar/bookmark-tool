@@ -11,6 +11,7 @@ export interface BookmarkData {
   categories: Record<string, Bookmark[]>
   categoryOrder: string[]
   categoryEmojis: Record<string, string>
+  categoryPublicStatus: Record<string, boolean>
 }
 
 export interface DragState {
@@ -42,7 +43,8 @@ interface UseBookmarkManagerHybridOptions {
   onUpdateCategory?: (
     oldName: string,
     newName: string,
-    emoji: string | null
+    emoji: string | null,
+    isPublic?: boolean
   ) => Promise<void>
 }
 
@@ -55,6 +57,7 @@ export function useBookmarkManagerHybrid(
     categories: {},
     categoryOrder: [],
     categoryEmojis: {},
+    categoryPublicStatus: {},
   })
 
   const [modals, setModals] = useState<ModalState>({
@@ -131,6 +134,10 @@ export function useBookmarkManagerHybrid(
       if (stored) {
         const parsed = JSON.parse(stored)
         console.log('✅ Loaded guest data:', parsed)
+        // Ensure categoryPublicStatus exists
+        if (!parsed.categoryPublicStatus) {
+          parsed.categoryPublicStatus = {}
+        }
         setBookmarkData(parsed)
       } else {
         console.log('📝 No guest data found, initializing empty state')
@@ -138,6 +145,7 @@ export function useBookmarkManagerHybrid(
           categories: {},
           categoryOrder: [],
           categoryEmojis: {},
+          categoryPublicStatus: {},
         })
       }
     } catch (error) {
@@ -146,6 +154,7 @@ export function useBookmarkManagerHybrid(
         categories: {},
         categoryOrder: [],
         categoryEmojis: {},
+        categoryPublicStatus: {},
       })
     }
   }
@@ -192,6 +201,7 @@ export function useBookmarkManagerHybrid(
       const newCategories: Record<string, Bookmark[]> = {}
       const categoryOrder: string[] = []
       const categoryEmojis: Record<string, string> = {}
+      const categoryPublicStatus: Record<string, boolean> = {}
 
       categories?.forEach((cat) => {
         newCategories[cat.name] = []
@@ -199,6 +209,7 @@ export function useBookmarkManagerHybrid(
         if (cat.emoji) {
           categoryEmojis[cat.name] = cat.emoji
         }
+        categoryPublicStatus[cat.name] = cat.is_public || false
       })
 
       bookmarks?.forEach((bookmark) => {
@@ -219,6 +230,7 @@ export function useBookmarkManagerHybrid(
         categories: newCategories,
         categoryOrder,
         categoryEmojis,
+        categoryPublicStatus,
       })
     } catch (error) {
       console.error('❌ Error loading from database:', error)
@@ -226,6 +238,7 @@ export function useBookmarkManagerHybrid(
         categories: {},
         categoryOrder: [],
         categoryEmojis: {},
+        categoryPublicStatus: {},
       })
     }
   }
@@ -374,7 +387,11 @@ export function useBookmarkManagerHybrid(
   )
 
   const createOrUpdateCategory = useCallback(
-    async (name: string, editingCategoryName?: string | null) => {
+    async (
+      name: string,
+      editingCategoryName?: string | null,
+      isPublic: boolean = false
+    ) => {
       if (!validateCategoryName(name)) {
         showToast(
           'Category name must be 2-30 characters long and contain only letters, numbers, and spaces.',
@@ -384,7 +401,7 @@ export function useBookmarkManagerHybrid(
       }
 
       if (editingCategoryName) {
-        return updateCategory(editingCategoryName, name)
+        return updateCategory(editingCategoryName, name, isPublic)
       }
 
       if (bookmarkData.categories[name]) {
@@ -403,6 +420,7 @@ export function useBookmarkManagerHybrid(
             name,
             emoji: selectedEmoji,
             category_order: newOrder,
+            is_public: isPublic,
           })
 
           console.log('✅ Category synced successfully')
@@ -431,6 +449,10 @@ export function useBookmarkManagerHybrid(
           categoryEmojis: selectedEmoji
             ? { ...prev.categoryEmojis, [name]: selectedEmoji }
             : prev.categoryEmojis,
+          categoryPublicStatus: {
+            ...prev.categoryPublicStatus,
+            [name]: isPublic,
+          },
         }
 
         // For guest mode, immediately save to localStorage
@@ -453,10 +475,13 @@ export function useBookmarkManagerHybrid(
   )
 
   const updateCategory = useCallback(
-    async (oldName: string, newName: string) => {
+    async (oldName: string, newName: string, isPublic?: boolean) => {
+      const currentIsPublic = bookmarkData.categoryPublicStatus[oldName]
+
       if (
         newName === oldName &&
-        selectedEmoji === bookmarkData.categoryEmojis[oldName]
+        selectedEmoji === bookmarkData.categoryEmojis[oldName] &&
+        (isPublic === undefined || isPublic === currentIsPublic)
       ) {
         closeModal('categoryModal')
         setEditingCategory(null)
@@ -484,9 +509,15 @@ export function useBookmarkManagerHybrid(
             oldName,
             newName,
             emoji: selectedEmoji,
+            isPublic,
           })
 
-          await options.onUpdateCategory(oldName, newName, selectedEmoji)
+          await options.onUpdateCategory(
+            oldName,
+            newName,
+            selectedEmoji,
+            isPublic
+          )
           console.log('✅ Category updated successfully')
         } catch (error: any) {
           console.error('❌ Error updating category:', error)
@@ -503,6 +534,7 @@ export function useBookmarkManagerHybrid(
       setBookmarkData((prev) => {
         const newCategories = { ...prev.categories }
         const newEmojis = { ...prev.categoryEmojis }
+        const newPublicStatus = { ...prev.categoryPublicStatus }
 
         if (newName !== oldName) {
           newCategories[newName] = newCategories[oldName]
@@ -518,8 +550,23 @@ export function useBookmarkManagerHybrid(
           delete newEmojis[oldName]
         }
 
+        // Handle public status
+        if (isPublic !== undefined) {
+          newPublicStatus[newName] = isPublic
+          if (newName !== oldName) {
+            delete newPublicStatus[oldName]
+          }
+        } else if (
+          newName !== oldName &&
+          newPublicStatus[oldName] !== undefined
+        ) {
+          newPublicStatus[newName] = newPublicStatus[oldName]
+          delete newPublicStatus[oldName]
+        }
+
         if (newName !== oldName) {
           delete newEmojis[oldName]
+          delete newPublicStatus[oldName]
         }
 
         const newOrder =
@@ -531,6 +578,7 @@ export function useBookmarkManagerHybrid(
           categories: newCategories,
           categoryOrder: newOrder,
           categoryEmojis: newEmojis,
+          categoryPublicStatus: newPublicStatus,
         }
 
         // For guest mode, immediately save to localStorage
@@ -570,9 +618,11 @@ export function useBookmarkManagerHybrid(
       setBookmarkData((prev) => {
         const newCategories = { ...prev.categories }
         const newEmojis = { ...prev.categoryEmojis }
+        const newPublicStatus = { ...prev.categoryPublicStatus }
 
         delete newCategories[categoryName]
         delete newEmojis[categoryName]
+        delete newPublicStatus[categoryName]
 
         const updatedData = {
           categories: newCategories,
@@ -580,6 +630,7 @@ export function useBookmarkManagerHybrid(
             (cat) => cat !== categoryName
           ),
           categoryEmojis: newEmojis,
+          categoryPublicStatus: newPublicStatus,
         }
 
         // For guest mode, immediately save to localStorage
@@ -718,6 +769,65 @@ export function useBookmarkManagerHybrid(
     [options.userId]
   )
 
+  const toggleCategoryVisibility = useCallback(
+    async (categoryName: string) => {
+      const currentStatus =
+        bookmarkData.categoryPublicStatus[categoryName] || false
+      const newStatus = !currentStatus
+
+      if (options.userId) {
+        try {
+          const { createClient } = await import('@/lib/supabase-client')
+          const supabase = createClient()
+
+          const { error } = await supabase
+            .from('categories')
+            .update({ is_public: newStatus })
+            .eq('user_id', options.userId)
+            .eq('name', categoryName)
+
+          if (error) throw error
+
+          setBookmarkData((prev) => ({
+            ...prev,
+            categoryPublicStatus: {
+              ...prev.categoryPublicStatus,
+              [categoryName]: newStatus,
+            },
+          }))
+
+          showToast(
+            `Category is now ${newStatus ? 'public' : 'private'}!`,
+            'success'
+          )
+        } catch (error) {
+          console.error('Error toggling visibility:', error)
+          showToast('Failed to update visibility', 'error')
+        }
+      } else {
+        // Guest mode
+        setBookmarkData((prev) => {
+          const updated = {
+            ...prev,
+            categoryPublicStatus: {
+              ...prev.categoryPublicStatus,
+              [categoryName]: newStatus,
+            },
+          }
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(updated))
+          }
+          return updated
+        })
+        showToast(
+          `Category is now ${newStatus ? 'public' : 'private'}!`,
+          'success'
+        )
+      }
+    },
+    [bookmarkData.categoryPublicStatus, options.userId, showToast]
+  )
+
   return {
     bookmarkData,
     modals,
@@ -740,5 +850,6 @@ export function useBookmarkManagerHybrid(
     shareCategory,
     reorderCategories,
     setSelectedEmoji,
+    toggleCategoryVisibility,
   }
 }

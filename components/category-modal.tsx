@@ -1,19 +1,22 @@
 'use client'
 
-import type React from 'react'
-
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
+import { Globe, Lock } from 'lucide-react'
 
 interface CategoryModalProps {
   show: boolean
   onClose: () => void
-  onSave: (name: string, editingCategory: string | null) => boolean
+  onSave: (
+    name: string,
+    editingCategory: string | null,
+    isPublic: boolean
+  ) => boolean
   selectedEmoji: string | null
   onEmojiSelect: (emoji: string | null) => void
   editingCategory: string | null
+  currentIsPublic?: boolean
 }
 
-// Complete emoji list with all your Unicode emojis converted
 const EMOJI_LIST = [
   // Original emojis (keeping your existing ones)
   '📁',
@@ -1027,61 +1030,6 @@ const EMOJI_LIST = [
   '🧘',
 ]
 
-// Utility function to convert emoji to Twemoji image URL
-const getEmojiImageUrl = (emoji: string) => {
-  const codePoint = [...emoji]
-    .map((char) => {
-      const code = char.codePointAt(0)
-      return code ? code.toString(16) : ''
-    })
-    .join('-')
-
-  return `https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/${codePoint}.svg`
-}
-
-// Custom Twemoji component
-const TwemojiEmoji: React.FC<{
-  emoji: string
-  className?: string
-  size?: number
-}> = ({ emoji, className = '', size = 20 }) => {
-  const [imgSrc, setImgSrc] = useState<string>('')
-  const [imgError, setImgError] = useState(false)
-
-  useEffect(() => {
-    setImgSrc(getEmojiImageUrl(emoji))
-    setImgError(false)
-  }, [emoji])
-
-  const handleError = () => {
-    setImgError(true)
-  }
-
-  if (imgError) {
-    // Fallback to native emoji if Twemoji fails to load
-    return (
-      <span className={className} style={{ fontSize: `${size}px` }}>
-        {emoji}
-      </span>
-    )
-  }
-
-  return (
-    <img
-      src={imgSrc}
-      alt={emoji}
-      className={className}
-      style={{
-        width: `${size}px`,
-        height: `${size}px`,
-        display: 'inline-block',
-        verticalAlign: 'middle',
-      }}
-      onError={handleError}
-    />
-  )
-}
-
 export function CategoryModal({
   show,
   onClose,
@@ -1089,43 +1037,23 @@ export function CategoryModal({
   selectedEmoji,
   onEmojiSelect,
   editingCategory,
+  currentIsPublic = false,
 }: CategoryModalProps) {
   const [categoryName, setCategoryName] = useState('')
+  const [isPublic, setIsPublic] = useState(false)
   const modalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (show) {
       setCategoryName(editingCategory || '')
-      // The selectedEmoji is already set by startEditingCategory in the hook
+      setIsPublic(currentIsPublic)
     }
-  }, [show, editingCategory])
-
-  useEffect(() => {
-    // Initialize Twemoji when component mounts and modal is shown
-    if (show && modalRef.current) {
-      // This will help with any remaining native emojis that weren't replaced
-      const script = document.createElement('script')
-      script.src =
-        'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/twemoji.min.js'
-      script.onload = () => {
-        if ((window as any).twemoji && modalRef.current) {
-          ;(window as any).twemoji.parse(modalRef.current, {
-            folder: 'svg',
-            ext: '.svg',
-          })
-        }
-      }
-      document.head.appendChild(script)
-
-      return () => {
-        document.head.removeChild(script)
-      }
-    }
-  }, [show])
+  }, [show, editingCategory, currentIsPublic])
 
   const handleSave = () => {
-    if (onSave(categoryName.trim(), editingCategory)) {
+    if (onSave(categoryName.trim(), editingCategory, isPublic)) {
       setCategoryName('')
+      setIsPublic(false)
       onEmojiSelect(null)
     }
   }
@@ -1256,7 +1184,7 @@ export function CategoryModal({
           border-radius: 12px;
           font-size: 16px;
           font-weight: 500;
-          background: #f1f1e3;
+          background: #ffffff;
           color: #334155;
           transition: all 0.3s ease;
           box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
@@ -1272,16 +1200,150 @@ export function CategoryModal({
         }
 
         .enhanced-input::placeholder {
-          color: #975226;
-          opacity: 0.7;
+          color: #94a3b8;
+          opacity: 1;
           font-weight: 400;
         }
 
+        /* Visibility Toggle Section */
+        .visibility-toggle {
+          background: rgba(151, 82, 38, 0.05);
+          border-radius: 12px;
+          padding: 16px;
+          margin-bottom: 20px;
+          border: 1px solid rgba(151, 82, 38, 0.2);
+        }
+
+        .toggle-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 12px;
+        }
+
+        .toggle-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: #333;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .toggle-switch {
+          position: relative;
+          width: 52px;
+          height: 28px;
+          background: #cbd5e1;
+          border-radius: 14px;
+          cursor: pointer;
+          transition: background 0.3s ease;
+        }
+
+        .toggle-switch.active {
+          background: #975226;
+        }
+
+        .toggle-slider {
+          position: absolute;
+          top: 2px;
+          left: 2px;
+          width: 24px;
+          height: 24px;
+          background: white;
+          border-radius: 50%;
+          transition: transform 0.3s ease;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .toggle-switch.active .toggle-slider {
+          transform: translateX(24px);
+        }
+
+        .visibility-options {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+          margin-bottom: 12px;
+        }
+
+        .visibility-option {
+          padding: 12px;
+          border: 2px solid #e2e8f0;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          background: white;
+        }
+
+        .visibility-option:hover {
+          border-color: #975226;
+          background: rgba(151, 82, 38, 0.05);
+        }
+
+        .visibility-option.selected {
+          border-color: #975226;
+          background: rgba(151, 82, 38, 0.1);
+        }
+
+        .option-icon {
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 8px;
+          background: rgba(151, 82, 38, 0.1);
+          color: #975226;
+        }
+
+        .visibility-option.selected .option-icon {
+          background: #975226;
+          color: white;
+        }
+
+        .option-content {
+          flex: 1;
+        }
+
+        .option-title {
+          font-size: 13px;
+          font-weight: 600;
+          color: #333;
+          margin-bottom: 2px;
+        }
+
+        .option-desc {
+          font-size: 11px;
+          color: #666;
+        }
+
+        .toggle-description {
+          font-size: 13px;
+          color: #666;
+          line-height: 1.5;
+          display: flex;
+          align-items: start;
+          gap: 8px;
+          padding: 12px;
+          background: rgba(151, 82, 38, 0.08);
+          border-radius: 8px;
+        }
+
+        .toggle-icon {
+          margin-top: 2px;
+          flex-shrink: 0;
+        }
+
+        /* Emoji Picker Section */
         .emoji-picker-section {
           background: rgba(151, 82, 38, 0.05);
           border-radius: 12px;
           padding: 20px;
-          border: 1px solid #975226;
+          border: 1px solid rgba(151, 82, 38, 0.2);
         }
 
         .emoji-picker-header {
@@ -1320,7 +1382,6 @@ export function CategoryModal({
           padding: 2px;
         }
 
-        /* Custom scrollbar for emoji grid */
         .emoji-grid::-webkit-scrollbar {
           width: 8px;
         }
@@ -1337,17 +1398,17 @@ export function CategoryModal({
         }
 
         .emoji-grid::-webkit-scrollbar-thumb:hover {
-          background: #f1f1e3;
+          background: #7a421e;
         }
 
         .emoji-btn {
           width: 44px;
           height: 44px;
           border: 2px solid transparent;
-          background: #f1f1e3;
+          background: white;
           border-radius: 10px;
           cursor: pointer;
-          font-size: 20px;
+          font-size: 24px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1364,18 +1425,19 @@ export function CategoryModal({
 
         .emoji-btn.selected {
           background: #975226;
-          border-color: #f1f1e3;
-          transform: scale(1.1);
+          border-color: #975226;
+          transform: scale(1.08);
           box-shadow: 0 4px 16px rgba(151, 82, 38, 0.4);
         }
 
         .emoji-btn.selected:hover {
-          transform: scale(1.1);
+          transform: scale(1.08);
         }
 
+        /* Modal Footer */
         .modal-footer {
           padding: 20px 24px 24px 24px;
-          border-top: 1px solid #975226;
+          border-top: 1px solid rgba(151, 82, 38, 0.2);
           display: flex;
           justify-content: flex-end;
           gap: 12px;
@@ -1423,68 +1485,17 @@ export function CategoryModal({
         }
 
         .btn-primary:hover {
-          background: #f1f1e3;
-          color: #975226;
-          border-color: #975226;
+          background: #7a421e;
+          border-color: #7a421e;
           transform: translateY(-2px);
           box-shadow: 0 8px 20px rgba(151, 82, 38, 0.4);
         }
 
-        /* Twemoji specific styles */
-        .twemoji-emoji {
-          display: inline-block !important;
-          vertical-align: middle !important;
+        .btn-primary:active {
+          transform: translateY(0);
         }
 
-        .emoji-btn .twemoji-emoji {
-          width: 20px !important;
-          height: 20px !important;
-        }
-
-        /* Dark mode support */
-        @media (prefers-color-scheme: dark) {
-          .modal-content {
-            background: #f1f1e3;
-            border-color: #975226;
-            color: #333;
-          }
-
-          .modal-body {
-            background: #f1f1e3;
-          }
-
-          .emoji-picker-section {
-            background: rgba(151, 82, 38, 0.15);
-            border-color: #975226;
-          }
-
-          .enhanced-input {
-            background: #f1f1e3;
-            border-color: #975226;
-            color: #333;
-          }
-
-          .enhanced-input:focus {
-            background: #f1f1e3;
-            border-color: #975226;
-          }
-
-          .emoji-btn {
-            background: #f1f1e3;
-            color: #333;
-          }
-
-          .emoji-btn:hover {
-            background: rgba(151, 82, 38, 0.1);
-          }
-
-          .modal-footer {
-            background: rgba(151, 82, 38, 0.1);
-            border-color: #975226;
-          }
-        }
-
-        /* Responsive design */
+        /* Responsive Design */
         @media (max-width: 640px) {
           .modal-content {
             width: 95%;
@@ -1497,6 +1508,10 @@ export function CategoryModal({
             padding: 16px;
           }
 
+          .visibility-options {
+            grid-template-columns: 1fr;
+          }
+
           .emoji-grid {
             grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
             gap: 6px;
@@ -1505,12 +1520,7 @@ export function CategoryModal({
           .emoji-btn {
             width: 40px;
             height: 40px;
-            font-size: 18px;
-          }
-
-          .emoji-btn .twemoji-emoji {
-            width: 18px !important;
-            height: 18px !important;
+            font-size: 20px;
           }
         }
       `}</style>
@@ -1538,6 +1548,7 @@ export function CategoryModal({
           </div>
 
           <div className="modal-body">
+            {/* Category Name Input */}
             <div className="enhanced-input-group">
               <i className="input-icon fa-solid fa-folder"></i>
               <input
@@ -1551,6 +1562,69 @@ export function CategoryModal({
                 onKeyDown={handleKeyDown}
                 autoFocus
               />
+            </div>
+
+            {/* Visibility Toggle Section */}
+            <div className="visibility-toggle">
+              <div className="toggle-header">
+                <span className="toggle-title">
+                  {isPublic ? (
+                    <Globe className="w-4 h-4" />
+                  ) : (
+                    <Lock className="w-4 h-4" />
+                  )}
+                  Category Visibility
+                </span>
+                <div
+                  className={`toggle-switch ${isPublic ? 'active' : ''}`}
+                  onClick={() => setIsPublic(!isPublic)}
+                >
+                  <div className="toggle-slider" />
+                </div>
+              </div>
+
+              <div className="visibility-options">
+                <div
+                  className={`visibility-option ${!isPublic ? 'selected' : ''}`}
+                  onClick={() => setIsPublic(false)}
+                >
+                  <div className="option-icon">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <div className="option-content">
+                    <div className="option-title">Private</div>
+                    <div className="option-desc">Only visible to you</div>
+                  </div>
+                </div>
+
+                <div
+                  className={`visibility-option ${isPublic ? 'selected' : ''}`}
+                  onClick={() => setIsPublic(true)}
+                >
+                  <div className="option-icon">
+                    <Globe className="w-4 h-4" />
+                  </div>
+                  <div className="option-content">
+                    <div className="option-title">Public</div>
+                    <div className="option-desc">Visible on profile</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="toggle-description">
+                <span className="toggle-icon">
+                  {isPublic ? (
+                    <Globe className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <Lock className="w-4 h-4 text-gray-600" />
+                  )}
+                </span>
+                <span>
+                  {isPublic
+                    ? 'This category and its bookmarks will be visible on your public profile.'
+                    : 'This category and its bookmarks will only be visible to you.'}
+                </span>
+              </div>
             </div>
 
             {/* Emoji Picker Section */}
@@ -1576,11 +1650,7 @@ export function CategoryModal({
                         onEmojiSelect(selectedEmoji === emoji ? null : emoji)
                       }
                     >
-                      <TwemojiEmoji
-                        emoji={emoji}
-                        className="twemoji-emoji"
-                        size={20}
-                      />
+                      {emoji}
                     </button>
                   ))}
                 </div>
@@ -1590,7 +1660,8 @@ export function CategoryModal({
 
           <div className="modal-footer">
             <button className="btn btn-secondary" onClick={onClose}>
-              <i className="fa-solid fa-times"></i>Cancel
+              <i className="fa-solid fa-times"></i>
+              Cancel
             </button>
             <button className="btn btn-primary" onClick={handleSave}>
               <i

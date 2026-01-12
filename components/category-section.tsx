@@ -19,6 +19,7 @@ import {
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { BookmarkData } from '@/hooks/use-bookmark-manager'
+import { Globe, Lock } from 'lucide-react'
 
 interface CategorySectionProps {
   bookmarkData: BookmarkData
@@ -35,6 +36,7 @@ interface CategorySectionProps {
   onReorderCategories: (fromIndex: number, toIndex: number) => void
   editingCategory: string | null
   onUpdateCategory: (oldName: string, newName: string) => boolean
+  onToggleVisibility?: (categoryName: string) => void
 }
 
 interface SortableCategoryItemProps {
@@ -44,6 +46,7 @@ interface SortableCategoryItemProps {
   emoji?: string
   isExpanded: boolean
   editingName: string
+  isPublic: boolean
   onToggleCategory: (categoryName: string) => void
   onEditCategory: (categoryName: string) => void
   onDeleteCategory: (categoryName: string) => void
@@ -55,6 +58,7 @@ interface SortableCategoryItemProps {
   onShareCategory: (categoryName: string) => void
   onSetEditingName: (name: string) => void
   onUpdateCategory: (oldName: string, newName: string) => boolean
+  onToggleVisibility?: (categoryName: string) => void
 }
 
 // Utility function to convert emoji to Twemoji image URL
@@ -128,6 +132,7 @@ function SortableCategoryItem({
   emoji,
   isExpanded,
   editingName,
+  isPublic,
   onToggleCategory,
   onEditCategory,
   onDeleteCategory,
@@ -135,6 +140,7 @@ function SortableCategoryItem({
   onShareCategory,
   onSetEditingName,
   onUpdateCategory,
+  onToggleVisibility,
 }: SortableCategoryItemProps) {
   const {
     attributes,
@@ -230,6 +236,31 @@ function SortableCategoryItem({
           </button>
 
           <span className="bookmark-count">{bookmarks.length}</span>
+
+          {/* ADD VISIBILITY BADGE */}
+          {onToggleVisibility && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleVisibility(categoryName)
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className={`visibility-badge ${isPublic ? 'public' : 'private'}`}
+              title={`Click to make ${isPublic ? 'private' : 'public'}`}
+            >
+              {isPublic ? (
+                <span className="flex items-center gap-1">
+                  <Globe className="w-3 h-3" />
+                  <span>Public</span>
+                </span>
+              ) : (
+                <span className="flex items-center gap-1">
+                  <Lock className="w-3 h-3" />
+                  <span>Private</span>
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         <div className="category-actions">
@@ -325,6 +356,7 @@ export function CategorySection({
   onReorderCategories,
   editingCategory,
   onUpdateCategory,
+  onToggleVisibility,
 }: CategorySectionProps) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set()
@@ -439,6 +471,41 @@ export function CategorySection({
           height: 20px !important;
         }
 
+        .visibility-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 4px 8px;
+          border-radius: 6px;
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          margin-left: 8px;
+          border: none;
+          outline: none;
+        }
+
+        .visibility-badge.public {
+          background: rgba(34, 197, 94, 0.1);
+          color: #16a34a;
+          border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .visibility-badge.public:hover {
+          background: rgba(34, 197, 94, 0.2);
+        }
+
+        .visibility-badge.private {
+          background: rgba(100, 116, 139, 0.1);
+          color: #475569;
+          border: 1px solid rgba(100, 116, 139, 0.3);
+        }
+
+        .visibility-badge.private:hover {
+          background: rgba(100, 116, 139, 0.2);
+        }
+
         /* Responsive adjustments */
         @media (max-width: 640px) {
           .category-icon {
@@ -457,6 +524,12 @@ export function CategorySection({
             height: 28px;
             margin-left: 6px;
             margin-right: 6px;
+          }
+
+          .visibility-badge {
+            font-size: 10px;
+            padding: 3px 6px;
+            margin-left: 4px;
           }
         }
       `}</style>
@@ -500,6 +573,8 @@ export function CategorySection({
                       bookmarkData.categories[categoryName] || []
                     const emoji = bookmarkData.categoryEmojis[categoryName]
                     const isExpanded = expandedCategories.has(categoryName)
+                    const isPublic =
+                      bookmarkData.categoryPublicStatus?.[categoryName] || false
 
                     return (
                       <SortableCategoryItem
@@ -509,6 +584,7 @@ export function CategorySection({
                         bookmarks={bookmarks}
                         emoji={emoji}
                         isExpanded={isExpanded}
+                        isPublic={isPublic}
                         editingName={editingName}
                         onToggleCategory={toggleCategory}
                         onEditCategory={onEditCategory}
@@ -517,6 +593,7 @@ export function CategorySection({
                         onShareCategory={onShareCategory}
                         onSetEditingName={setEditingName}
                         onUpdateCategory={onUpdateCategory}
+                        onToggleVisibility={onToggleVisibility}
                       />
                     )
                   })}
