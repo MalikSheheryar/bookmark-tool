@@ -1,0 +1,744 @@
+'use client'
+
+import { useState, useCallback, useRef, useEffect } from 'react'
+
+export interface Bookmark {
+  siteName: string
+  siteURL: string
+}
+
+export interface BookmarkData {
+  categories: Record<string, Bookmark[]>
+  categoryOrder: string[]
+  categoryEmojis: Record<string, string>
+}
+
+export interface DragState {
+  dragging: boolean
+  draggedElement: HTMLElement | null
+  draggedIndex: number
+  dropIndex: number
+}
+
+export interface ToastState {
+  show: boolean
+  message: string
+  type: 'success' | 'error'
+}
+
+export interface ModalState {
+  errorModal: boolean
+  categoryModal: boolean
+  shareCategoryModal: boolean
+  deleteModal: boolean
+}
+
+interface UseBookmarkManagerHybridOptions {
+  userId?: string
+  onSyncBookmark?: (bookmark: any) => Promise<void>
+  onSyncCategory?: (category: any) => Promise<void>
+  onDeleteBookmark?: (categoryName: string, index: number) => Promise<void>
+  onDeleteCategory?: (categoryName: string) => Promise<void>
+  onUpdateCategory?: (
+    oldName: string,
+    newName: string,
+    emoji: string | null
+  ) => Promise<void>
+}
+
+const GUEST_STORAGE_KEY = 'bookmarkData_guest'
+
+export function useBookmarkManagerHybrid(
+  options: UseBookmarkManagerHybridOptions = {}
+) {
+  const [bookmarkData, setBookmarkData] = useState<BookmarkData>({
+    categories: {},
+    categoryOrder: [],
+    categoryEmojis: {},
+  })
+
+  const [modals, setModals] = useState<ModalState>({
+    errorModal: false,
+    categoryModal: false,
+    shareCategoryModal: false,
+    deleteModal: false,
+  })
+
+  const [toast, setToast] = useState<ToastState>({
+    show: false,
+    message: '',
+    type: 'success',
+  })
+
+  const [dragState, setDragState] = useState<DragState>({
+    dragging: false,
+    draggedElement: null,
+    draggedIndex: -1,
+    dropIndex: -1,
+  })
+
+  const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null)
+  const [editingCategory, setEditingCategory] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<any>(null)
+  const [deleteType, setDeleteType] = useState<'category' | 'bookmark' | null>(
+    null
+  )
+  const [isDataLoaded, setIsDataLoaded] = useState(false)
+
+  const toastTimeoutRef = useRef<NodeJS.Timeout>()
+  const previousUserIdRef = useRef<string | undefined>(options.userId)
+
+  // Load data on mount and when user changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const loadData = async () => {
+      try {
+        if (options.userId) {
+          console.log('📥 Loading data from database for user:', options.userId)
+          await loadFromDatabase()
+        } else {
+          console.log('📥 Loading guest data from localStorage')
+          loadFromGuestStorage()
+        }
+        setIsDataLoaded(true)
+      } catch (error) {
+        console.error('❌ Error loading bookmarks:', error)
+        setIsDataLoaded(true)
+      }
+    }
+
+    const userChanged = previousUserIdRef.current !== options.userId
+
+    if (userChanged) {
+      if (options.userId) {
+        console.log('👤 User logged in, loading user data from database')
+        loadData()
+      } else {
+        console.log('👤 User logged out, loading guest data')
+        loadFromGuestStorage()
+        setIsDataLoaded(true)
+      }
+      previousUserIdRef.current = options.userId
+    } else if (!isDataLoaded) {
+      loadData()
+    }
+  }, [options.userId])
+
+  const loadFromGuestStorage = () => {
+    try {
+      const stored = localStorage.getItem(GUEST_STORAGE_KEY)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        console.log('✅ Loaded guest data:', parsed)
+        setBookmarkData(parsed)
+      } else {
+        console.log('📝 No guest data found, initializing empty state')
+        setBookmarkData({
+          categories: {},
+          categoryOrder: [],
+          categoryEmojis: {},
+        })
+      }
+    } catch (error) {
+      console.error('❌ Error loading guest bookmarks:', error)
+      setBookmarkData({
+        categories: {},
+        categoryOrder: [],
+        categoryEmojis: {},
+      })
+    }
+  }
+
+  const loadFromDatabase = async () => {
+    if (!options.userId) return
+
+    try {
+      const { createClient } = await import('@/lib/supabase-client')
+      const supabase = createClient()
+
+      console.log('🔍 Fetching categories for user:', options.userId)
+      const { data: categories, error: catError } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('user_id', options.userId)
+        .order('category_order', { ascending: true })
+
+      if (catError) {
+        console.error('❌ Error loading categories:', catError)
+        throw catError
+      }
+
+      console.log(
+        '✅ Loaded categories:',
+        categories?.length || 0,
+        'categories'
+      )
+
+      console.log('🔍 Fetching bookmarks for user:', options.userId)
+      const { data: bookmarks, error: bookError } = await supabase
+        .from('bookmarks')
+        .select('*')
+        .eq('user_id', options.userId)
+        .order('created_at', { ascending: true })
+
+      if (bookError) {
+        console.error('❌ Error loading bookmarks:', bookError)
+        throw bookError
+      }
+
+      console.log('✅ Loaded bookmarks:', bookmarks?.length || 0, 'bookmarks')
+
+      const newCategories: Record<string, Bookmark[]> = {}
+      const categoryOrder: string[] = []
+      const categoryEmojis: Record<string, string> = {}
+
+      categories?.forEach((cat) => {
+        newCategories[cat.name] = []
+        categoryOrder.push(cat.name)
+        if (cat.emoji) {
+          categoryEmojis[cat.name] = cat.emoji
+        }
+      })
+
+      bookmarks?.forEach((bookmark) => {
+        if (newCategories[bookmark.category_name]) {
+          newCategories[bookmark.category_name].push({
+            siteName: bookmark.site_name,
+            siteURL: bookmark.site_url,
+          })
+        }
+      })
+
+      console.log('📊 Final loaded data:', {
+        categoriesCount: Object.keys(newCategories).length,
+        totalBookmarks: bookmarks?.length || 0,
+      })
+
+      setBookmarkData({
+        categories: newCategories,
+        categoryOrder,
+        categoryEmojis,
+      })
+    } catch (error) {
+      console.error('❌ Error loading from database:', error)
+      setBookmarkData({
+        categories: {},
+        categoryOrder: [],
+        categoryEmojis: {},
+      })
+    }
+  }
+
+  // Save to localStorage for guest mode (backup auto-save)
+  useEffect(() => {
+    if (!isDataLoaded) return
+    if (typeof window === 'undefined') return
+    if (options.userId) return
+
+    try {
+      console.log('💾 Auto-saving guest data to localStorage')
+      localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(bookmarkData))
+    } catch (error) {
+      console.error('❌ Error saving guest bookmarks:', error)
+    }
+  }, [bookmarkData, options.userId, isDataLoaded])
+
+  const showModal = useCallback((modalId: keyof ModalState, data?: any) => {
+    setModals((prev) => ({ ...prev, [modalId]: true }))
+
+    if (modalId === 'deleteModal' && data) {
+      setDeleteType(data.type)
+      setDeleteTarget(data.target)
+    }
+  }, [])
+
+  const closeModal = useCallback((modalId: keyof ModalState) => {
+    setModals((prev) => ({ ...prev, [modalId]: false }))
+
+    if (modalId === 'categoryModal') {
+      setSelectedEmoji(null)
+      setEditingCategory(null)
+    }
+  }, [])
+
+  const showToast = useCallback(
+    (message: string, type: 'success' | 'error' = 'success') => {
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current)
+      }
+
+      setToast({ show: true, message, type })
+
+      toastTimeoutRef.current = setTimeout(() => {
+        setToast((prev) => ({ ...prev, show: false }))
+      }, 3000)
+    },
+    []
+  )
+
+  const validateBookmarkName = (name: string): boolean => {
+    const trimmed = name.trim()
+    return (
+      trimmed.length >= 3 &&
+      /^[a-zA-Z0-9\s]+$/.test(trimmed) &&
+      !trimmed.startsWith(' ') &&
+      !trimmed.endsWith(' ')
+    )
+  }
+
+  const validateURL = (url: string): boolean => {
+    try {
+      const normalizedURL = url.startsWith('http') ? url : `https://${url}`
+      new URL(normalizedURL)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const normalizeURL = (url: string): string => {
+    return url.startsWith('http') ? url : `https://${url}`
+  }
+
+  const validateCategoryName = (name: string): boolean => {
+    return (
+      name.length >= 2 && name.length <= 30 && /^[a-zA-Z0-9\s]+$/.test(name)
+    )
+  }
+
+  const addBookmark = useCallback(
+    async (formData: { name: string; url: string; category: string }) => {
+      if (
+        !validateBookmarkName(formData.name) ||
+        !validateURL(formData.url) ||
+        !formData.category
+      ) {
+        showModal('errorModal')
+        return false
+      }
+
+      const normalizedURL = normalizeURL(formData.url.trim())
+      const bookmark: Bookmark = {
+        siteName: formData.name.trim(),
+        siteURL: normalizedURL,
+      }
+
+      if (options.userId && options.onSyncBookmark) {
+        try {
+          console.log('💾 Syncing bookmark to database')
+
+          await options.onSyncBookmark({
+            user_id: options.userId,
+            site_name: bookmark.siteName,
+            site_url: bookmark.siteURL,
+            category_name: formData.category,
+          })
+
+          console.log('✅ Bookmark synced successfully')
+        } catch (error) {
+          console.error('❌ Error syncing bookmark:', error)
+          showToast('Failed to save bookmark. Please try again.', 'error')
+          return false
+        }
+      }
+
+      setBookmarkData((prev) => {
+        const updatedData = {
+          ...prev,
+          categories: {
+            ...prev.categories,
+            [formData.category]: [
+              ...(prev.categories[formData.category] || []),
+              bookmark,
+            ],
+          },
+        }
+
+        // For guest mode, immediately save to localStorage
+        if (!options.userId && typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(updatedData))
+          } catch (error) {
+            console.error('❌ Error saving to localStorage:', error)
+          }
+        }
+
+        return updatedData
+      })
+
+      showToast('Bookmark added successfully!')
+      return true
+    },
+    [options, showModal, showToast]
+  )
+
+  const createOrUpdateCategory = useCallback(
+    async (name: string, editingCategoryName?: string | null) => {
+      if (!validateCategoryName(name)) {
+        showToast(
+          'Category name must be 2-30 characters long and contain only letters, numbers, and spaces.',
+          'error'
+        )
+        return false
+      }
+
+      if (editingCategoryName) {
+        return updateCategory(editingCategoryName, name)
+      }
+
+      if (bookmarkData.categories[name]) {
+        showToast('Category already exists!', 'error')
+        return false
+      }
+
+      const newOrder = bookmarkData.categoryOrder.length
+
+      if (options.userId && options.onSyncCategory) {
+        try {
+          console.log('💾 Syncing category to database:', name)
+
+          await options.onSyncCategory({
+            user_id: options.userId,
+            name,
+            emoji: selectedEmoji,
+            category_order: newOrder,
+          })
+
+          console.log('✅ Category synced successfully')
+        } catch (error: any) {
+          console.error('❌ Error syncing category:', error)
+
+          if (
+            error?.code === '23505' ||
+            error?.message?.includes('duplicate') ||
+            error?.message?.includes('unique') ||
+            error?.message?.includes('already exists')
+          ) {
+            showToast('This category already exists in your account!', 'error')
+          } else {
+            showToast('Failed to create category. Please try again.', 'error')
+          }
+          return false
+        }
+      }
+
+      setBookmarkData((prev) => {
+        const updatedData = {
+          ...prev,
+          categories: { ...prev.categories, [name]: [] },
+          categoryOrder: [...prev.categoryOrder, name],
+          categoryEmojis: selectedEmoji
+            ? { ...prev.categoryEmojis, [name]: selectedEmoji }
+            : prev.categoryEmojis,
+        }
+
+        // For guest mode, immediately save to localStorage
+        if (!options.userId && typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(updatedData))
+          } catch (error) {
+            console.error('❌ Error saving to localStorage:', error)
+          }
+        }
+
+        return updatedData
+      })
+
+      closeModal('categoryModal')
+      showToast(`Category "${name}" created successfully!`)
+      return true
+    },
+    [bookmarkData, selectedEmoji, closeModal, showToast, options]
+  )
+
+  const updateCategory = useCallback(
+    async (oldName: string, newName: string) => {
+      if (
+        newName === oldName &&
+        selectedEmoji === bookmarkData.categoryEmojis[oldName]
+      ) {
+        closeModal('categoryModal')
+        setEditingCategory(null)
+        return true
+      }
+
+      if (newName !== oldName) {
+        if (!validateCategoryName(newName)) {
+          showToast(
+            'Category name must be 2-30 characters long and contain only letters, numbers, and spaces.',
+            'error'
+          )
+          return false
+        }
+
+        if (bookmarkData.categories[newName]) {
+          showToast('Category name already exists!', 'error')
+          return false
+        }
+      }
+
+      if (options.userId && options.onUpdateCategory) {
+        try {
+          console.log('🔄 Updating category in database:', {
+            oldName,
+            newName,
+            emoji: selectedEmoji,
+          })
+
+          await options.onUpdateCategory(oldName, newName, selectedEmoji)
+          console.log('✅ Category updated successfully')
+        } catch (error: any) {
+          console.error('❌ Error updating category:', error)
+
+          if (error?.message?.includes('already exists')) {
+            showToast('A category with this name already exists!', 'error')
+          } else {
+            showToast('Failed to update category. Please try again.', 'error')
+          }
+          return false
+        }
+      }
+
+      setBookmarkData((prev) => {
+        const newCategories = { ...prev.categories }
+        const newEmojis = { ...prev.categoryEmojis }
+
+        if (newName !== oldName) {
+          newCategories[newName] = newCategories[oldName]
+          delete newCategories[oldName]
+        }
+
+        if (selectedEmoji) {
+          newEmojis[newName] = selectedEmoji
+        } else if (newName !== oldName && newEmojis[oldName]) {
+          newEmojis[newName] = newEmojis[oldName]
+          delete newEmojis[oldName]
+        } else if (newName === oldName) {
+          delete newEmojis[oldName]
+        }
+
+        if (newName !== oldName) {
+          delete newEmojis[oldName]
+        }
+
+        const newOrder =
+          newName !== oldName
+            ? prev.categoryOrder.map((cat) => (cat === oldName ? newName : cat))
+            : prev.categoryOrder
+
+        const updatedData = {
+          categories: newCategories,
+          categoryOrder: newOrder,
+          categoryEmojis: newEmojis,
+        }
+
+        // For guest mode, immediately save to localStorage
+        if (!options.userId && typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(updatedData))
+          } catch (error) {
+            console.error('❌ Error saving to localStorage:', error)
+          }
+        }
+
+        return updatedData
+      })
+
+      closeModal('categoryModal')
+      setEditingCategory(null)
+      showToast('Category updated successfully!')
+      return true
+    },
+    [bookmarkData, selectedEmoji, closeModal, showToast, options]
+  )
+
+  const deleteCategory = useCallback(
+    async (categoryName: string) => {
+      if (options.userId && options.onDeleteCategory) {
+        try {
+          console.log('🗑️ Deleting category from database:', categoryName)
+          await options.onDeleteCategory(categoryName)
+          console.log('✅ Category deleted successfully')
+        } catch (error) {
+          console.error('❌ Error deleting category:', error)
+          showToast('Failed to delete category. Please try again.', 'error')
+          return
+        }
+      }
+
+      setBookmarkData((prev) => {
+        const newCategories = { ...prev.categories }
+        const newEmojis = { ...prev.categoryEmojis }
+
+        delete newCategories[categoryName]
+        delete newEmojis[categoryName]
+
+        const updatedData = {
+          categories: newCategories,
+          categoryOrder: prev.categoryOrder.filter(
+            (cat) => cat !== categoryName
+          ),
+          categoryEmojis: newEmojis,
+        }
+
+        // For guest mode, immediately save to localStorage
+        if (!options.userId && typeof window !== 'undefined') {
+          try {
+            console.log('💾 Immediately saving deletion to localStorage')
+            localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(updatedData))
+          } catch (error) {
+            console.error('❌ Error saving to localStorage:', error)
+          }
+        }
+
+        return updatedData
+      })
+
+      showToast(`Category "${categoryName}" deleted successfully!`)
+    },
+    [options, showToast]
+  )
+
+  const deleteBookmark = useCallback(
+    async (categoryName: string, bookmarkIndex: number) => {
+      const bookmark = bookmarkData.categories[categoryName][bookmarkIndex]
+
+      if (options.userId && options.onDeleteBookmark) {
+        try {
+          console.log('🗑️ Deleting bookmark from database:', bookmark.siteName)
+          await options.onDeleteBookmark(categoryName, bookmarkIndex)
+          console.log('✅ Bookmark deleted successfully')
+        } catch (error) {
+          console.error('❌ Error deleting bookmark:', error)
+          showToast('Failed to delete bookmark. Please try again.', 'error')
+          return
+        }
+      }
+
+      setBookmarkData((prev) => {
+        const updatedData = {
+          ...prev,
+          categories: {
+            ...prev.categories,
+            [categoryName]: prev.categories[categoryName].filter(
+              (_, index) => index !== bookmarkIndex
+            ),
+          },
+        }
+
+        // For guest mode, immediately save to localStorage
+        if (!options.userId && typeof window !== 'undefined') {
+          try {
+            console.log(
+              '💾 Immediately saving bookmark deletion to localStorage'
+            )
+            localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(updatedData))
+          } catch (error) {
+            console.error('❌ Error saving to localStorage:', error)
+          }
+        }
+
+        return updatedData
+      })
+
+      showToast(`"${bookmark.siteName}" deleted successfully!`)
+    },
+    [bookmarkData.categories, options, showToast]
+  )
+
+  const toggleCategory = useCallback(() => {}, [])
+
+  const startEditingCategory = useCallback(
+    (categoryName: string) => {
+      setEditingCategory(categoryName)
+      setSelectedEmoji(bookmarkData.categoryEmojis[categoryName] || null)
+      showModal('categoryModal')
+    },
+    [bookmarkData.categoryEmojis, showModal]
+  )
+
+  const shareCategory = useCallback(
+    (categoryName: string) => {
+      const categoryData = {
+        name: categoryName,
+        bookmarks: bookmarkData.categories[categoryName],
+        emoji: bookmarkData.categoryEmojis[categoryName],
+      }
+
+      try {
+        const shortId =
+          Math.random().toString(36).substring(2, 10) +
+          Date.now().toString(36).slice(-4)
+
+        const storageKey = `shared_category_${shortId}`
+
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(storageKey, JSON.stringify(categoryData))
+        }
+
+        const baseUrl =
+          typeof window !== 'undefined' ? window.location.origin : ''
+        const shareUrl = `${baseUrl}/shared/${shortId}`
+
+        setDeleteTarget({ name: categoryName, shareUrl })
+        showModal('shareCategoryModal')
+      } catch (error) {
+        console.error('❌ Error creating share URL:', error)
+        showToast('Error creating share link. Please try again.', 'error')
+      }
+    },
+    [bookmarkData, showModal, showToast]
+  )
+
+  const reorderCategories = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      setBookmarkData((prev) => {
+        const newOrder = [...prev.categoryOrder]
+        const [movedItem] = newOrder.splice(fromIndex, 1)
+        newOrder.splice(toIndex, 0, movedItem)
+
+        const updatedData = {
+          ...prev,
+          categoryOrder: newOrder,
+        }
+
+        // For guest mode, immediately save to localStorage
+        if (!options.userId && typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(updatedData))
+          } catch (error) {
+            console.error('❌ Error saving to localStorage:', error)
+          }
+        }
+
+        return updatedData
+      })
+    },
+    [options.userId]
+  )
+
+  return {
+    bookmarkData,
+    modals,
+    toast,
+    dragState,
+    selectedEmoji,
+    editingCategory,
+    deleteTarget,
+    deleteType,
+    showModal,
+    closeModal,
+    showToast,
+    addBookmark,
+    createOrUpdateCategory,
+    updateCategory,
+    deleteCategory,
+    deleteBookmark,
+    toggleCategory,
+    startEditingCategory,
+    shareCategory,
+    reorderCategories,
+    setSelectedEmoji,
+  }
+}
