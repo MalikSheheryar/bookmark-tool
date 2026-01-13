@@ -52,8 +52,8 @@ export default function Home() {
       }}
     >
       {/* Hero Section */}
-      <header className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden pt-20">
-        <div className="text-center max-w-2xl mx-auto z-10 pt-20">
+      <header className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden pt-5">
+        <div className="text-center max-w-2xl mx-auto z-10 pt-5">
           <div className="inline-flex items-center gap-2 bg-white/60 backdrop-blur-sm px-4 py-2 rounded-full mb-6 shadow-sm">
             <Sparkles className="w-4 h-4" style={{ color: '#5f462d' }} />
             <span className="text-sm font-medium" style={{ color: '#5f462d' }}>

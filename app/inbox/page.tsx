@@ -1,0 +1,526 @@
+// File: app/inbox/page.tsx
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/components/auth-provider'
+import {
+  Mail,
+  MailOpen,
+  ExternalLink,
+  Trash2,
+  Send,
+  CheckCheck,
+  Clock,
+  ArrowLeft,
+} from 'lucide-react'
+import {
+  getInboxMessages,
+  markMessageAsRead,
+  markAllMessagesAsRead,
+  deleteInboxMessage,
+  subscribeToInboxMessages,
+  unsubscribeFromInbox,
+  type InboxMessageWithSender,
+} from '@/lib/inbox-service'
+import { ShareCategoryModal } from '@/components/share-category-modal'
+import type { RealtimeChannel } from '@supabase/supabase-js'
+
+export default function InboxPage() {
+  const router = useRouter()
+  const { dbUser, isLoading: authLoading } = useAuth()
+
+  const [messages, setMessages] = useState<InboxMessageWithSender[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<'all' | 'unread'>('all')
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [processing, setProcessing] = useState<string | null>(null)
+
+  // 🔍 DEBUG: Log auth state changes
+  useEffect(() => {
+    console.log('🔍 [InboxPage] Auth state changed:', {
+      hasDbUser: !!dbUser,
+      userId: dbUser?.id,
+      username: dbUser?.username,
+      authLoading,
+      timestamp: new Date().toISOString(),
+    })
+  }, [dbUser, authLoading])
+
+  // 🔍 DEBUG: Log modal state changes
+  useEffect(() => {
+    console.log('🔍 [InboxPage] Modal state changed:', {
+      showShareModal,
+      timestamp: new Date().toISOString(),
+    })
+  }, [showShareModal])
+
+  // Realtime subscription
+  useEffect(() => {
+    if (!dbUser?.id) {
+      console.log('🔍 [InboxPage] Skipping realtime setup - no user ID')
+      return
+    }
+
+    console.log(
+      '🔍 [InboxPage] Setting up realtime subscription for user:',
+      dbUser.id
+    )
+
+    let channel: RealtimeChannel
+
+    const setupRealtime = async () => {
+      channel = subscribeToInboxMessages(dbUser.id, (newMessage) => {
+        console.log(
+          '📬 [InboxPage] New message received via Realtime!',
+          newMessage
+        )
+
+        // Fetch the full message with sender details
+        fetchMessages()
+
+        // Show notification
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('New Category Share', {
+            body: `You received a category share from someone!`,
+            icon: '/favicon.ico',
+          })
+        }
+      })
+    }
+
+    setupRealtime()
+
+    return () => {
+      console.log('🔍 [InboxPage] Cleaning up realtime subscription')
+      if (channel) {
+        unsubscribeFromInbox(channel)
+      }
+    }
+  }, [dbUser?.id])
+
+  // Request notification permission
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      console.log('🔍 [InboxPage] Requesting notification permission')
+      Notification.requestPermission().then((permission) => {
+        console.log('🔍 [InboxPage] Notification permission:', permission)
+      })
+    }
+  }, [])
+
+  const fetchMessages = async () => {
+    if (!dbUser?.id) {
+      console.log('🔍 [InboxPage] Cannot fetch messages - no user ID')
+      return
+    }
+
+    console.log('🔍 [InboxPage] Fetching messages...', {
+      userId: dbUser.id,
+      filter,
+    })
+
+    try {
+      setLoading(true)
+      const data = await getInboxMessages(dbUser.id, {
+        unreadOnly: filter === 'unread',
+      })
+      console.log('✅ [InboxPage] Messages fetched:', {
+        count: data.length,
+        messages: data,
+      })
+      setMessages(data)
+    } catch (error) {
+      console.error('❌ [InboxPage] Error fetching messages:', {
+        error,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!authLoading && !dbUser) {
+      console.log('🔍 [InboxPage] No user detected, redirecting to login')
+      router.replace('/auth/login')
+      return
+    }
+
+    if (dbUser?.id) {
+      console.log('🔍 [InboxPage] User detected, fetching messages')
+      fetchMessages()
+    }
+  }, [dbUser, authLoading, filter, router])
+
+  const handleMarkAsRead = async (messageId: string) => {
+    if (!dbUser?.id) return
+
+    console.log('🔍 [InboxPage] Marking message as read:', messageId)
+    setProcessing(messageId)
+    try {
+      const success = await markMessageAsRead(messageId, dbUser.id)
+      console.log('✅ [InboxPage] Mark as read result:', success)
+      if (success) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId ? { ...msg, is_read: true } : msg
+          )
+        )
+      }
+    } catch (error) {
+      console.error('❌ [InboxPage] Error marking as read:', error)
+    } finally {
+      setProcessing(null)
+    }
+  }
+
+  const handleMarkAllAsRead = async () => {
+    if (!dbUser?.id) return
+
+    console.log('🔍 [InboxPage] Marking all messages as read')
+    setProcessing('all')
+    try {
+      await markAllMessagesAsRead(dbUser.id)
+      console.log('✅ [InboxPage] All messages marked as read')
+      setMessages((prev) => prev.map((msg) => ({ ...msg, is_read: true })))
+    } catch (error) {
+      console.error('❌ [InboxPage] Error marking all as read:', error)
+    } finally {
+      setProcessing(null)
+    }
+  }
+
+  const handleDelete = async (messageId: string) => {
+    if (!dbUser?.id) return
+    if (!confirm('Are you sure you want to delete this message?')) return
+
+    console.log('🔍 [InboxPage] Deleting message:', messageId)
+    setProcessing(messageId)
+    try {
+      const success = await deleteInboxMessage(messageId, dbUser.id)
+      console.log('✅ [InboxPage] Delete result:', success)
+      if (success) {
+        setMessages((prev) => prev.filter((msg) => msg.id !== messageId))
+      }
+    } catch (error) {
+      console.error('❌ [InboxPage] Error deleting message:', error)
+    } finally {
+      setProcessing(null)
+    }
+  }
+
+  const getInitials = (message: InboxMessageWithSender) => {
+    const name = message.sender_full_name || message.sender_username
+    const parts = name.trim().split(' ')
+    if (parts.length === 1) return parts[0][0].toUpperCase()
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  }
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+    if (seconds < 60) return 'Just now'
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
+    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`
+    return date.toLocaleDateString()
+  }
+
+  const unreadCount = messages.filter((m) => !m.is_read).length
+
+  // 🔍 DEBUG: Log render state
+  console.log('🔍 [InboxPage] Render state:', {
+    authLoading,
+    hasDbUser: !!dbUser,
+    userId: dbUser?.id,
+    username: dbUser?.username,
+    showShareModal,
+    messagesCount: messages.length,
+    unreadCount,
+    loading,
+  })
+
+  if (authLoading || !dbUser) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{
+          background: 'linear-gradient(135deg, #f5f5dc 0%, #f0f0e6 100%)',
+        }}
+      >
+        <div className="text-center">
+          <div
+            className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4"
+            style={{ borderColor: '#5f462d' }}
+          />
+          <p style={{ color: '#5f462d' }}>Loading inbox...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="min-h-screen py-8 pt-24"
+      style={{
+        background: 'linear-gradient(135deg, #f5f5dc 0%, #f0f0e6 100%)',
+      }}
+    >
+      <div className="container mx-auto px-4 max-w-4xl">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => {
+                console.log('🔍 [InboxPage] Back button clicked')
+                router.push('/dashboard')
+              }}
+              className="p-2 rounded-lg hover:bg-white/50 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" style={{ color: '#5f462d' }} />
+            </button>
+            <div>
+              <h1 className="text-3xl font-bold" style={{ color: '#5f462d' }}>
+                📬 Inbox
+              </h1>
+              <p className="text-sm text-gray-600 mt-1">
+                {unreadCount > 0
+                  ? `${unreadCount} unread message${
+                      unreadCount !== 1 ? 's' : ''
+                    }`
+                  : 'All caught up!'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              console.log('🔍 [InboxPage] Share Category button clicked')
+              console.log('🔍 [InboxPage] Current dbUser:', {
+                id: dbUser.id,
+                username: dbUser.username,
+              })
+              setShowShareModal(true)
+              console.log('🔍 [InboxPage] showShareModal set to true')
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-semibold transition-all hover:shadow-lg"
+            style={{ background: '#5f462d' }}
+          >
+            <Send className="w-4 h-4" />
+            Share Category
+          </button>
+        </div>
+
+        {/* Filters & Actions */}
+        <div className="bg-white rounded-lg shadow-md p-4 mb-6 flex items-center justify-between flex-wrap gap-4">
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                console.log('🔍 [InboxPage] Filter changed to: all')
+                setFilter('all')
+              }}
+              className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                filter === 'all'
+                  ? 'text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+              style={filter === 'all' ? { background: '#5f462d' } : {}}
+            >
+              All Messages
+            </button>
+            <button
+              onClick={() => {
+                console.log('🔍 [InboxPage] Filter changed to: unread')
+                setFilter('unread')
+              }}
+              className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                filter === 'unread'
+                  ? 'text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+              style={filter === 'unread' ? { background: '#5f462d' } : {}}
+            >
+              Unread ({unreadCount})
+            </button>
+          </div>
+
+          {unreadCount > 0 && (
+            <button
+              onClick={handleMarkAllAsRead}
+              disabled={processing === 'all'}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+            >
+              <CheckCheck className="w-4 h-4" />
+              Mark All Read
+            </button>
+          )}
+        </div>
+
+        {/* Messages List */}
+        {loading ? (
+          <div className="bg-white rounded-lg shadow-md p-12 text-center">
+            <div
+              className="animate-spin rounded-full h-10 w-10 border-b-2 mx-auto mb-4"
+              style={{ borderColor: '#5f462d' }}
+            />
+            <p className="text-gray-600">Loading messages...</p>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-md p-12 text-center">
+            <div className="text-6xl mb-4">
+              {filter === 'unread' ? '✅' : '📭'}
+            </div>
+            <h3 className="text-xl font-bold mb-2" style={{ color: '#5f462d' }}>
+              {filter === 'unread' ? 'All Caught Up!' : 'No Messages Yet'}
+            </h3>
+            <p className="text-gray-600 mb-6">
+              {filter === 'unread'
+                ? "You've read all your messages"
+                : "You haven't received any category shares yet"}
+            </p>
+            <button
+              onClick={() => {
+                console.log('🔍 [InboxPage] Empty state Share button clicked')
+                setShowShareModal(true)
+              }}
+              className="px-6 py-3 rounded-lg text-white font-semibold hover:shadow-lg transition-all"
+              style={{ background: '#5f462d' }}
+            >
+              Share a Category
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`bg-white rounded-lg shadow-md p-6 transition-all hover:shadow-lg ${
+                  !message.is_read ? 'border-l-4' : ''
+                }`}
+                style={!message.is_read ? { borderColor: '#5f462d' } : {}}
+              >
+                <div className="flex items-start gap-4">
+                  {/* Sender Avatar */}
+                  <div className="flex-shrink-0">
+                    {message.sender_profile_picture ? (
+                      <img
+                        src={message.sender_profile_picture}
+                        alt={message.sender_username}
+                        className="w-12 h-12 rounded-full object-cover border-2"
+                        style={{ borderColor: '#5f462d' }}
+                      />
+                    ) : (
+                      <div
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold border-2"
+                        style={{
+                          background: '#5f462d',
+                          borderColor: '#5f462d',
+                        }}
+                      >
+                        {getInitials(message)}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Message Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-900">
+                            {message.sender_full_name ||
+                              message.sender_username}
+                          </span>
+                          {!message.is_read && (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+                              NEW
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                          <span>@{message.sender_username}</span>
+                          <span>•</span>
+                          <Clock className="w-3 h-3" />
+                          <span>{formatTimeAgo(message.created_at)}</span>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-2">
+                        {!message.is_read && (
+                          <button
+                            onClick={() => handleMarkAsRead(message.id)}
+                            disabled={processing === message.id}
+                            className="p-2 rounded-lg hover:bg-green-50 text-green-600 transition-colors disabled:opacity-50"
+                            title="Mark as read"
+                          >
+                            <MailOpen className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(message.id)}
+                          disabled={processing === message.id}
+                          className="p-2 rounded-lg hover:bg-red-50 text-red-600 transition-colors disabled:opacity-50"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Shared Category */}
+                    <div className="bg-gray-50 rounded-lg p-4 mb-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">
+                            Shared Category:
+                          </p>
+                          <p className="font-semibold text-gray-900">
+                            {message.category_name}
+                          </p>
+                        </div>
+                        <a
+                          href={message.category_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium transition-all hover:shadow-md"
+                          style={{ background: '#5f462d' }}
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          View
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Note */}
+                    {message.note && (
+                      <div className="bg-blue-50 border-l-4 border-blue-400 p-3 rounded">
+                        <p className="text-sm text-gray-700 italic">
+                          "{message.note}"
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* FIXED: Pass currentUsername to ShareCategoryModal */}
+      <ShareCategoryModal
+        show={showShareModal}
+        onClose={() => {
+          console.log('🔍 [InboxPage] Modal onClose triggered')
+          setShowShareModal(false)
+        }}
+        currentUserId={dbUser.id}
+        currentUsername={dbUser.username}
+      />
+    </div>
+  )
+}

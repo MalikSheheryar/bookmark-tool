@@ -27,7 +27,6 @@ import {
   getUserProfileClient,
 } from '@/lib/user-service'
 import { useAuth } from '@/components/auth-provider'
-// 1. Add these imports at the top
 import { Share2, Check, Copy, Globe } from 'lucide-react'
 import {
   checkUsernameAvailable,
@@ -65,7 +64,6 @@ export default function ProfileView({
   const [formData, setFormData] = useState({
     full_name: '',
     username: '',
-
     bio: '',
     instagram_url: '',
     twitter_url: '',
@@ -73,8 +71,6 @@ export default function ProfileView({
   })
 
   const [profilePicture, setProfilePicture] = useState<string | null>(null)
-
-  const [showShareModal, setShowShareModal] = useState(false)
   const [shareUrlCopied, setShareUrlCopied] = useState(false)
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(
     null
@@ -107,7 +103,6 @@ export default function ProfileView({
     return () => clearTimeout(timer)
   }, [formData.username, userProfile.username, userId])
 
-  // Fetch user profile
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -128,14 +123,13 @@ export default function ProfileView({
           })
           setProfilePicture(profile.profile_picture_url)
         } else {
-          // Profile doesn't exist yet - will be created on first save
           setFormData({
-            full_name: profile.full_name || '',
-            username: profile.username || '',
-            bio: profile.bio || '',
-            instagram_url: profile.instagram_url || '',
-            twitter_url: profile.twitter_url || '',
-            other_link: profile.other_link || '',
+            full_name: '',
+            username: '',
+            bio: '',
+            instagram_url: '',
+            twitter_url: '',
+            other_link: '',
           })
         }
       } catch (err) {
@@ -162,20 +156,9 @@ export default function ProfileView({
     }
   }
 
-  // 6. Add function to generate username
   const handleGenerateUsername = async () => {
     const generated = await generateUsername(formData.full_name || 'user')
     setFormData({ ...formData, username: generated })
-  }
-
-  // 7. Add function to handle profile sharing
-  const handleShareProfile = () => {
-    if (!userProfile.username) {
-      setError('Please set a username first to share your profile')
-      setTimeout(() => setError(null), 3000)
-      return
-    }
-    setShowShareModal(true)
   }
 
   const copyShareUrl = async () => {
@@ -184,6 +167,7 @@ export default function ProfileView({
     setShareUrlCopied(true)
     setTimeout(() => setShareUrlCopied(false), 2000)
   }
+
   const handleProfilePictureChange = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -268,14 +252,12 @@ export default function ProfileView({
     setSuccess(null)
 
     try {
-      // Validate
       if (!formData.full_name.trim()) {
         setError('Full name is required')
         setIsSaving(false)
         return
       }
 
-      // Validate username if changed
       if (formData.username !== userProfile.username) {
         if (!formData.username.trim()) {
           setError('Username is required for public profile')
@@ -329,32 +311,28 @@ export default function ProfileView({
       setIsSaving(false)
     }
   }
+
   const handleCancel = () => {
     setIsEditing(false)
     setFormData({
-      full_name: profile.full_name || '',
-      username: profile.username || '',
-      bio: profile.bio || '',
-      instagram_url: profile.instagram_url || '',
-      twitter_url: profile.twitter_url || '',
-      other_link: profile.other_link || '',
+      full_name: userProfile.full_name || '',
+      username: userProfile.username || '',
+      bio: userProfile.bio || '',
+      instagram_url: userProfile.instagram_url || '',
+      twitter_url: userProfile.twitter_url || '',
+      other_link: userProfile.other_link || '',
     })
     setError(null)
   }
 
   const getInitials = () => {
     const name = userProfile.full_name || userEmail || 'User'
-
     if (!name) return 'U'
-
     const nameParts = name.trim().split(' ').filter(Boolean)
-
     if (nameParts.length === 0) return 'U'
-
     if (nameParts.length === 1) {
       return (nameParts[0]?.[0] || 'U').toUpperCase()
     }
-
     return (
       (nameParts[0]?.[0] || '') + (nameParts[nameParts.length - 1]?.[0] || '')
     ).toUpperCase()
@@ -392,51 +370,6 @@ export default function ProfileView({
         </h1>
       </div>
 
-      {userProfile.username && (
-        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg shadow-md p-6 mb-6 border-2 border-blue-200">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <h3
-                className="text-lg font-bold mb-2"
-                style={{ color: '#5f462d' }}
-              >
-                <Globe className="w-5 h-5 inline mr-2" />
-                Share Your Profile
-              </h3>
-              <p className="text-sm text-gray-600 mb-3">
-                Your public profile URL (share via email, SMS, or social media)
-              </p>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 bg-white px-4 py-3 rounded-lg border-2 border-gray-300 font-mono text-sm">
-                  {`${
-                    typeof window !== 'undefined' ? window.location.origin : ''
-                  }/u/${userProfile.username}`}
-                </div>
-                <button
-                  onClick={copyShareUrl}
-                  className="px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-2"
-                  style={{
-                    background: shareUrlCopied ? '#22c55e' : '#5f462d',
-                    color: 'white',
-                  }}
-                >
-                  {shareUrlCopied ? (
-                    <>
-                      <Check className="w-4 h-4" />
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4" />
-                      Copy
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
       {/* Messages */}
       {error && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex justify-between items-center">
@@ -523,11 +456,51 @@ export default function ProfileView({
           {/* Profile Info */}
           <div className="flex-1">
             <div className="flex justify-between items-start mb-4">
-              <div>
-                <h2 className="text-3xl font-bold" style={{ color: '#5f462d' }}>
-                  {userProfile.full_name || 'Add your name'}
-                </h2>
-                {userProfile.bio && (
+              <div className="flex-1">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h2
+                    className="text-3xl font-bold"
+                    style={{ color: '#5f462d' }}
+                  >
+                    {userProfile.full_name || 'Add your name'}
+                  </h2>
+                  {/* Share Button - Next to Name */}
+                  {userProfile.username && !isEditing && (
+                    <button
+                      onClick={copyShareUrl}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium text-sm transition-all"
+                      style={{
+                        background: shareUrlCopied ? '#22c55e' : '#5f462d',
+                        color: 'white',
+                      }}
+                      title="Copy profile link"
+                    >
+                      {shareUrlCopied ? (
+                        <>
+                          <Check className="w-4 h-4" />
+                          <span className="hidden sm:inline">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Share2 className="w-4 h-4" />
+                          <span className="hidden sm:inline">Share</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+
+                {/* Username Badge */}
+                {userProfile.username && !isEditing && (
+                  <div className="flex items-center gap-2 mt-2 mb-3">
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-medium border border-blue-200">
+                      <Globe className="w-3 h-3" />
+                      /u/{userProfile.username}
+                    </span>
+                  </div>
+                )}
+
+                {userProfile.bio && !isEditing && (
                   <p className="text-gray-600 mt-2 text-sm leading-relaxed max-w-md">
                     {userProfile.bio}
                   </p>
@@ -536,11 +509,11 @@ export default function ProfileView({
               {!isEditing && (
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-colors font-medium whitespace-nowrap"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-colors font-medium whitespace-nowrap ml-4"
                   style={{ background: '#5f462d' }}
                 >
                   <Edit2 className="w-4 h-4" />
-                  Edit
+                  <span className="hidden sm:inline">Edit</span>
                 </button>
               )}
             </div>
