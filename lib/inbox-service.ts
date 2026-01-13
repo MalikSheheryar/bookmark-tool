@@ -1,6 +1,7 @@
-// File: lib/inbox-service.ts
+// File: lib/inbox-service.ts (UPDATED - Add share_token support)
 import { createClient } from './supabase-client'
 import type { RealtimeChannel } from '@supabase/supabase-js'
+import { generateShareToken } from './shared-category-service'
 
 export interface InboxMessage {
   id: string
@@ -12,6 +13,7 @@ export interface InboxMessage {
   is_read: boolean
   created_at: string
   updated_at: string
+  share_token: string | null // ADD THIS
 }
 
 export interface InboxMessageWithSender extends InboxMessage {
@@ -24,9 +26,68 @@ export interface InboxMessageWithSender extends InboxMessage {
 export interface SendMessageParams {
   recipientId: string
   categoryName: string
-  categoryUrl: string
+  categoryUrl: string // This will still be generated but won't be used
   note?: string
 }
+
+/**
+ * Send a category share message with unique share token
+ */
+export async function sendCategoryShare(
+  senderId: string,
+  params: SendMessageParams
+): Promise<InboxMessage> {
+  const supabase = createClient()
+
+  // Validate note length
+  if (params.note && params.note.length > 100) {
+    throw new Error('Note must be 100 characters or less')
+  }
+
+  // Validate not sending to self
+  if (senderId === params.recipientId) {
+    throw new Error('Cannot send messages to yourself')
+  }
+
+  // Generate unique share token
+  const shareToken = generateShareToken()
+
+  // ✅ FIXED: Generate URL using share token instead of user ID
+  const shareUrl = `${
+    typeof window !== 'undefined' ? window.location.origin : ''
+  }/shared/${shareToken}`
+
+  console.log('📤 Sending share with token:', {
+    shareToken,
+    shareUrl,
+    categoryName: params.categoryName,
+    recipientId: params.recipientId,
+  })
+
+  const { data, error } = await supabase
+    .from('inbox_messages')
+    .insert({
+      sender_id: senderId,
+      recipient_id: params.recipientId,
+      category_name: params.categoryName,
+      category_url: shareUrl, // Use share URL with token
+      note: params.note || null,
+      share_token: shareToken, // ADD THIS
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error sending message:', error)
+    throw new Error('Failed to send message')
+  }
+
+  console.log('✅ Share sent successfully:', data)
+
+  return data as InboxMessage
+}
+
+// ... Keep all other existing functions unchanged (getInboxMessages, getUnreadCount, etc.) ...
 
 /**
  * Get all inbox messages for a user
@@ -56,7 +117,10 @@ export async function getInboxMessages(
   }
 
   if (options?.offset) {
-    query = query.range(options.offset, options.offset + (options.limit || 10) - 1)
+    query = query.range(
+      options.offset,
+      options.offset + (options.limit || 10) - 1
+    )
   }
 
   const { data, error } = await query
@@ -85,45 +149,6 @@ export async function getUnreadCount(userId: string): Promise<number> {
   }
 
   return data || 0
-}
-
-/**
- * Send a category share message
- */
-export async function sendCategoryShare(
-  senderId: string,
-  params: SendMessageParams
-): Promise<InboxMessage> {
-  const supabase = createClient()
-
-  // Validate note length
-  if (params.note && params.note.length > 100) {
-    throw new Error('Note must be 100 characters or less')
-  }
-
-  // Validate not sending to self
-  if (senderId === params.recipientId) {
-    throw new Error('Cannot send messages to yourself')
-  }
-
-  const { data, error } = await supabase
-    .from('inbox_messages')
-    .insert({
-      sender_id: senderId,
-      recipient_id: params.recipientId,
-      category_name: params.categoryName,
-      category_url: params.categoryUrl,
-      note: params.note || null,
-    })
-    .select()
-    .single()
-
-  if (error) {
-    console.error('Error sending message:', error)
-    throw new Error('Failed to send message')
-  }
-
-  return data as InboxMessage
 }
 
 /**
@@ -211,7 +236,10 @@ export async function getSentMessages(
   }
 
   if (options?.offset) {
-    query = query.range(options.offset, options.offset + (options.limit || 10) - 1)
+    query = query.range(
+      options.offset,
+      options.offset + (options.limit || 10) - 1
+    )
   }
 
   const { data, error } = await query
@@ -296,12 +324,14 @@ export async function searchUsersForSharing(
   query: string,
   currentUserId: string,
   limit: number = 20
-): Promise<Array<{
-  id: string
-  username: string
-  full_name: string | null
-  profile_picture_url: string | null
-}>> {
+): Promise<
+  Array<{
+    id: string
+    username: string
+    full_name: string | null
+    profile_picture_url: string | null
+  }>
+> {
   const supabase = createClient()
 
   const { data, error } = await supabase

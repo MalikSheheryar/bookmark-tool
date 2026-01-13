@@ -519,7 +519,6 @@ export default function InboxPage() {
           setShowShareModal(false)
         }}
         currentUserId={dbUser.id}
-        currentUsername={dbUser.username}
       />
     </div>
   )

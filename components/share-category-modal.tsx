@@ -1,4 +1,4 @@
-// File: components/share-category-modal.tsx
+// File: components/share-category-modal.tsx (FIXED - Remove currentUsername dependency)
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -18,7 +18,7 @@ interface ShareCategoryModalProps {
   show: boolean
   onClose: () => void
   currentUserId: string
-  currentUsername: string
+  // ✅ REMOVED: currentUsername - not needed anymore!
 }
 
 interface UserOption {
@@ -38,7 +38,6 @@ export function ShareCategoryModal({
   show,
   onClose,
   currentUserId,
-  currentUsername,
 }: ShareCategoryModalProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [searchQuery, setSearchQuery] = useState('')
@@ -53,15 +52,6 @@ export function ShareCategoryModal({
   const [searching, setSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
-
-  // DEBUG: Log props
-  useEffect(() => {
-    console.log('🔍 [ShareModal] Props received:', {
-      currentUserId,
-      currentUsername,
-      show,
-    })
-  }, [currentUserId, currentUsername, show])
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -118,38 +108,22 @@ export function ShareCategoryModal({
     setError(null)
 
     try {
-      // ✅ FIXED: Use /u/{userId}/category/{categoryName} format
-      const categoryUrl = `${
-        window.location.origin
-      }/u/${currentUserId}/category/${encodeURIComponent(
-        selectedCategory.name
-      )}`
-
-      console.log('🔍 [ShareModal] Generating share URL:', {
-        currentUserId,
-        currentUsername,
-        categoryName: selectedCategory.name,
-        generatedUrl: categoryUrl,
-        expectedFormat: '/u/{userId}/category/{categoryName}',
-      })
-
+      // ✅ FIXED: URL will be generated in the service with share token
+      // We pass empty string as placeholder (will be replaced in service)
       await sendCategoryShare(currentUserId, {
         recipientId: selectedUser.id,
         categoryName: selectedCategory.name,
-        categoryUrl,
+        categoryUrl: '', // Will be generated in service
         note: note.trim() || undefined,
       })
 
-      console.log(
-        '✅ [ShareModal] Share sent successfully with URL:',
-        categoryUrl
-      )
+      console.log('✅ Share sent successfully!')
       setSuccess(true)
       setTimeout(() => {
         handleClose()
       }, 2000)
     } catch (err) {
-      console.error('❌ [ShareModal] Error:', err)
+      console.error('❌ Error sending share:', err)
       setError(err instanceof Error ? err.message : 'Failed to send share')
     } finally {
       setLoading(false)
