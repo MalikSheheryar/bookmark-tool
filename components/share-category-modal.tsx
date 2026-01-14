@@ -1,4 +1,4 @@
-// File: components/share-category-modal.tsx (FIXED - Remove currentUsername dependency)
+// File: components/share-category-modal.tsx (FIXED - Optimized dropdown UI)
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -305,23 +305,23 @@ export function ShareCategoryModal({
                     )}
 
                   {!searching && userResults.length > 0 && (
-                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2 -mr-2">
+                    <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                       {userResults.map((user) => (
                         <div
                           key={user.id}
-                          className="group p-4 border-2 border-gray-200 rounded-2xl cursor-pointer transition-all duration-200 hover:border-[#5f462d] hover:bg-gradient-to-r hover:from-[#5f462d]/5 hover:to-transparent hover:shadow-lg hover:scale-[1.02]"
+                          className="group p-3 border border-gray-200 rounded-xl cursor-pointer transition-all duration-200  hover:shadow-md"
                           onClick={() => handleSelectUser(user)}
                         >
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-3">
                             {user.profile_picture_url ? (
                               <img
                                 src={user.profile_picture_url}
                                 alt={user.username}
-                                className="w-14 h-14 rounded-full object-cover ring-2 ring-gray-200 group-hover:ring-[#5f462d] transition-all"
+                                className="w-10 h-10 rounded-full object-cover ring-2 ring-gray-200 group-hover:ring-[#5f462d] transition-all"
                               />
                             ) : (
                               <div
-                                className="w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg"
+                                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md"
                                 style={{
                                   background:
                                     'linear-gradient(135deg, #5f462d 0%, #7d5e3f 100%)',
@@ -331,15 +331,15 @@ export function ShareCategoryModal({
                               </div>
                             )}
                             <div className="flex-1 min-w-0">
-                              <p className="font-bold text-gray-900 truncate text-base">
+                              <p className="font-semibold text-gray-900 truncate text-sm">
                                 {user.full_name || user.username}
                               </p>
-                              <p className="text-sm text-gray-500 truncate">
+                              <p className="text-xs text-gray-500 truncate">
                                 @{user.username}
                               </p>
                             </div>
                             <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                              <div className="w-8 h-8 rounded-full bg-[#5f462d] flex items-center justify-center">
+                              <div className="w-7 h-7 rounded-full bg-[#5f462d] flex items-center justify-center">
                                 <Check className="w-4 h-4 text-white" />
                               </div>
                             </div>
@@ -388,22 +388,22 @@ export function ShareCategoryModal({
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2 -mr-2">
+                    <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                       {categories.map((category) => (
                         <div
                           key={category.id}
-                          className="group p-5 border-2 border-gray-200 rounded-2xl cursor-pointer transition-all duration-200 hover:border-[#5f462d] hover:bg-gradient-to-r hover:from-[#5f462d]/5 hover:to-transparent hover:shadow-lg hover:scale-[1.02]"
+                          className="group p-3 border border-gray-200 rounded-xl cursor-pointer transition-all duration-200 hover:border-[#5f462d] hover:bg-gradient-to-r hover:from-[#5f462d]/5 hover:to-transparent hover:shadow-md"
                           onClick={() => handleSelectCategory(category)}
                         >
-                          <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center text-3xl shadow-sm group-hover:shadow-md transition-shadow">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center text-2xl shadow-sm group-hover:shadow-md transition-shadow">
                               {category.emoji || '📁'}
                             </div>
-                            <p className="font-bold text-gray-900 flex-1 text-base">
+                            <p className="font-semibold text-gray-900 flex-1 text-sm">
                               {category.name}
                             </p>
                             <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                              <div className="w-8 h-8 rounded-full bg-[#5f462d] flex items-center justify-center">
+                              <div className="w-7 h-7 rounded-full bg-[#5f462d] flex items-center justify-center">
                                 <Check className="w-4 h-4 text-white" />
                               </div>
                             </div>

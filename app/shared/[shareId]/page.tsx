@@ -182,7 +182,7 @@ export default function SharedCategoryPage() {
                 'This shared category is not available or may have been deleted'}
             </p>
 
-            {/* Debug Info Box */}
+            {/* Debug Info Box
             <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 text-left">
               <div className="flex items-start gap-2">
                 <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
@@ -199,7 +199,7 @@ export default function SharedCategoryPage() {
                   </p>
                 </div>
               </div>
-            </div>
+            </div> */}
 
             <div className="space-y-2">
               <Link
@@ -248,7 +248,7 @@ export default function SharedCategoryPage() {
           </h1>
         </div>
 
-        {/* Debug Info (only in development) */}
+        {/* Debug Info (only in development)
         {process.env.NODE_ENV === 'development' && (
           <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 text-xs">
             <p className="font-semibold text-blue-800">Debug Info:</p>
@@ -259,7 +259,7 @@ export default function SharedCategoryPage() {
               Bookmarks: {data.bookmarks?.length || 0}
             </p>
           </div>
-        )}
+        )} */}
 
         {/* Sender Info Card */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">

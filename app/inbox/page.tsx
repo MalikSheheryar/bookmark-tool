@@ -1,7 +1,7 @@
 // File: app/inbox/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth-provider'
 import {
@@ -13,6 +13,7 @@ import {
   CheckCheck,
   Clock,
   ArrowLeft,
+  Sparkles,
 } from 'lucide-react'
 import {
   getInboxMessages,
@@ -20,6 +21,7 @@ import {
   markAllMessagesAsRead,
   deleteInboxMessage,
   subscribeToInboxMessages,
+  subscribeToMessageUpdates,
   unsubscribeFromInbox,
   type InboxMessageWithSender,
 } from '@/lib/inbox-service'
@@ -35,87 +37,22 @@ export default function InboxPage() {
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
   const [showShareModal, setShowShareModal] = useState(false)
   const [processing, setProcessing] = useState<string | null>(null)
+  const [newMessageAnimation, setNewMessageAnimation] = useState<string | null>(
+    null
+  )
 
-  // 🔍 DEBUG: Log auth state changes
-  useEffect(() => {
-    console.log('🔍 [InboxPage] Auth state changed:', {
-      hasDbUser: !!dbUser,
-      userId: dbUser?.id,
-      username: dbUser?.username,
-      authLoading,
-      timestamp: new Date().toISOString(),
-    })
-  }, [dbUser, authLoading])
+  // Use refs to track channels
+  const newMessageChannelRef = useRef<RealtimeChannel | null>(null)
+  const updateChannelRef = useRef<RealtimeChannel | null>(null)
 
-  // 🔍 DEBUG: Log modal state changes
-  useEffect(() => {
-    console.log('🔍 [InboxPage] Modal state changed:', {
-      showShareModal,
-      timestamp: new Date().toISOString(),
-    })
-  }, [showShareModal])
-
-  // Realtime subscription
-  useEffect(() => {
+  // Memoized fetch function
+  const fetchMessages = useCallback(async () => {
     if (!dbUser?.id) {
-      console.log('🔍 [InboxPage] Skipping realtime setup - no user ID')
+      console.log('🔍 [InboxPage] Cannot fetch - no user ID')
       return
     }
 
-    console.log(
-      '🔍 [InboxPage] Setting up realtime subscription for user:',
-      dbUser.id
-    )
-
-    let channel: RealtimeChannel
-
-    const setupRealtime = async () => {
-      channel = subscribeToInboxMessages(dbUser.id, (newMessage) => {
-        console.log(
-          '📬 [InboxPage] New message received via Realtime!',
-          newMessage
-        )
-
-        // Fetch the full message with sender details
-        fetchMessages()
-
-        // Show notification
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification('New Category Share', {
-            body: `You received a category share from someone!`,
-            icon: '/favicon.ico',
-          })
-        }
-      })
-    }
-
-    setupRealtime()
-
-    return () => {
-      console.log('🔍 [InboxPage] Cleaning up realtime subscription')
-      if (channel) {
-        unsubscribeFromInbox(channel)
-      }
-    }
-  }, [dbUser?.id])
-
-  // Request notification permission
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      console.log('🔍 [InboxPage] Requesting notification permission')
-      Notification.requestPermission().then((permission) => {
-        console.log('🔍 [InboxPage] Notification permission:', permission)
-      })
-    }
-  }, [])
-
-  const fetchMessages = async () => {
-    if (!dbUser?.id) {
-      console.log('🔍 [InboxPage] Cannot fetch messages - no user ID')
-      return
-    }
-
-    console.log('🔍 [InboxPage] Fetching messages...', {
+    console.log('📬 [InboxPage] Fetching messages...', {
       userId: dbUser.id,
       filter,
     })
@@ -125,86 +62,188 @@ export default function InboxPage() {
       const data = await getInboxMessages(dbUser.id, {
         unreadOnly: filter === 'unread',
       })
-      console.log('✅ [InboxPage] Messages fetched:', {
-        count: data.length,
-        messages: data,
-      })
+      console.log('✅ [InboxPage] Fetched', data.length, 'messages')
       setMessages(data)
     } catch (error) {
-      console.error('❌ [InboxPage] Error fetching messages:', {
-        error,
-        errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      })
+      console.error('❌ [InboxPage] Fetch error:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [dbUser?.id, filter])
 
+  // Initial fetch
   useEffect(() => {
     if (!authLoading && !dbUser) {
-      console.log('🔍 [InboxPage] No user detected, redirecting to login')
+      console.log('🔍 [InboxPage] No user, redirecting...')
       router.replace('/auth/login')
       return
     }
 
     if (dbUser?.id) {
-      console.log('🔍 [InboxPage] User detected, fetching messages')
+      console.log('✅ [InboxPage] User detected, fetching messages')
       fetchMessages()
     }
-  }, [dbUser, authLoading, filter, router])
+  }, [dbUser, authLoading, filter, router, fetchMessages])
 
+  // Realtime subscriptions - INSTANT UPDATES
+  useEffect(() => {
+    if (!dbUser?.id) return
+
+    console.log('🔔 [InboxPage] Setting up realtime...')
+
+    // Cleanup old subscriptions
+    if (newMessageChannelRef.current) {
+      unsubscribeFromInbox(newMessageChannelRef.current)
+    }
+    if (updateChannelRef.current) {
+      unsubscribeFromInbox(updateChannelRef.current)
+    }
+
+    // Subscribe to NEW messages
+    newMessageChannelRef.current = subscribeToInboxMessages(
+      dbUser.id,
+      (newMessage) => {
+        console.log('📨 [InboxPage] New message via Realtime!', newMessage)
+
+        // INSTANT optimistic update - add to list immediately
+        fetchMessages()
+
+        // Trigger animation
+        setNewMessageAnimation(newMessage.id)
+        setTimeout(() => setNewMessageAnimation(null), 2000)
+
+        // Show browser notification
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('New Category Share! 🎉', {
+            body: 'Someone shared a category with you',
+            icon: '/favicon.ico',
+            badge: '/favicon.ico',
+          })
+        }
+      }
+    )
+
+    // Subscribe to message UPDATES (mark as read, delete, etc)
+    updateChannelRef.current = subscribeToMessageUpdates(
+      dbUser.id,
+      (updatedMessage) => {
+        console.log(
+          '🔄 [InboxPage] Message updated via Realtime!',
+          updatedMessage
+        )
+
+        // INSTANT optimistic update
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === updatedMessage.id ? { ...msg, ...updatedMessage } : msg
+          )
+        )
+      }
+    )
+
+    console.log('✅ [InboxPage] Realtime subscriptions active')
+
+    return () => {
+      console.log('🧹 [InboxPage] Cleaning up realtime')
+      if (newMessageChannelRef.current) {
+        unsubscribeFromInbox(newMessageChannelRef.current)
+      }
+      if (updateChannelRef.current) {
+        unsubscribeFromInbox(updateChannelRef.current)
+      }
+    }
+  }, [dbUser?.id, fetchMessages])
+
+  // Request notification permission
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then((permission) => {
+        console.log('🔔 Notification permission:', permission)
+      })
+    }
+  }, [])
+
+  // Handle mark as read with INSTANT UI update
   const handleMarkAsRead = async (messageId: string) => {
     if (!dbUser?.id) return
 
-    console.log('🔍 [InboxPage] Marking message as read:', messageId)
+    console.log('✅ [InboxPage] Marking as read:', messageId)
     setProcessing(messageId)
+
+    // INSTANT optimistic update
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId ? { ...msg, is_read: true } : msg
+      )
+    )
+
     try {
       const success = await markMessageAsRead(messageId, dbUser.id)
-      console.log('✅ [InboxPage] Mark as read result:', success)
-      if (success) {
+      if (!success) {
+        // Revert on failure
+        console.error('❌ Failed to mark as read, reverting')
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === messageId ? { ...msg, is_read: true } : msg
+            msg.id === messageId ? { ...msg, is_read: false } : msg
           )
         )
       }
     } catch (error) {
-      console.error('❌ [InboxPage] Error marking as read:', error)
+      console.error('❌ Error marking as read:', error)
+      // Revert on error
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId ? { ...msg, is_read: false } : msg
+        )
+      )
     } finally {
       setProcessing(null)
     }
   }
 
+  // Handle mark all as read with INSTANT UI update
   const handleMarkAllAsRead = async () => {
     if (!dbUser?.id) return
 
-    console.log('🔍 [InboxPage] Marking all messages as read')
+    console.log('✅ [InboxPage] Marking all as read')
     setProcessing('all')
+
+    // INSTANT optimistic update
+    setMessages((prev) => prev.map((msg) => ({ ...msg, is_read: true })))
+
     try {
       await markAllMessagesAsRead(dbUser.id)
-      console.log('✅ [InboxPage] All messages marked as read')
-      setMessages((prev) => prev.map((msg) => ({ ...msg, is_read: true })))
     } catch (error) {
-      console.error('❌ [InboxPage] Error marking all as read:', error)
+      console.error('❌ Error marking all as read:', error)
+      // Revert on error
+      fetchMessages()
     } finally {
       setProcessing(null)
     }
   }
 
+  // Handle delete with INSTANT UI update
   const handleDelete = async (messageId: string) => {
     if (!dbUser?.id) return
     if (!confirm('Are you sure you want to delete this message?')) return
 
-    console.log('🔍 [InboxPage] Deleting message:', messageId)
+    console.log('🗑️  [InboxPage] Deleting:', messageId)
     setProcessing(messageId)
+
+    // INSTANT optimistic update
+    setMessages((prev) => prev.filter((msg) => msg.id !== messageId))
+
     try {
       const success = await deleteInboxMessage(messageId, dbUser.id)
-      console.log('✅ [InboxPage] Delete result:', success)
-      if (success) {
-        setMessages((prev) => prev.filter((msg) => msg.id !== messageId))
+      if (!success) {
+        // Revert on failure
+        console.error('❌ Failed to delete, reverting')
+        fetchMessages()
       }
     } catch (error) {
-      console.error('❌ [InboxPage] Error deleting message:', error)
+      console.error('❌ Error deleting:', error)
+      // Revert on error
+      fetchMessages()
     } finally {
       setProcessing(null)
     }
@@ -230,18 +269,6 @@ export default function InboxPage() {
   }
 
   const unreadCount = messages.filter((m) => !m.is_read).length
-
-  // 🔍 DEBUG: Log render state
-  console.log('🔍 [InboxPage] Render state:', {
-    authLoading,
-    hasDbUser: !!dbUser,
-    userId: dbUser?.id,
-    username: dbUser?.username,
-    showShareModal,
-    messagesCount: messages.length,
-    unreadCount,
-    loading,
-  })
 
   if (authLoading || !dbUser) {
     return (
@@ -274,10 +301,7 @@ export default function InboxPage() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => {
-                console.log('🔍 [InboxPage] Back button clicked')
-                router.push('/dashboard')
-              }}
+              onClick={() => router.push('/dashboard')}
               className="p-2 rounded-lg hover:bg-white/50 transition-colors"
             >
               <ArrowLeft className="w-5 h-5" style={{ color: '#5f462d' }} />
@@ -297,16 +321,8 @@ export default function InboxPage() {
           </div>
 
           <button
-            onClick={() => {
-              console.log('🔍 [InboxPage] Share Category button clicked')
-              console.log('🔍 [InboxPage] Current dbUser:', {
-                id: dbUser.id,
-                username: dbUser.username,
-              })
-              setShowShareModal(true)
-              console.log('🔍 [InboxPage] showShareModal set to true')
-            }}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-semibold transition-all hover:shadow-lg"
+            onClick={() => setShowShareModal(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-semibold transition-all hover:shadow-lg hover:scale-105"
             style={{ background: '#5f462d' }}
           >
             <Send className="w-4 h-4" />
@@ -318,13 +334,10 @@ export default function InboxPage() {
         <div className="bg-white rounded-lg shadow-md p-4 mb-6 flex items-center justify-between flex-wrap gap-4">
           <div className="flex gap-2">
             <button
-              onClick={() => {
-                console.log('🔍 [InboxPage] Filter changed to: all')
-                setFilter('all')
-              }}
+              onClick={() => setFilter('all')}
               className={`px-4 py-2 rounded-lg font-medium transition-all ${
                 filter === 'all'
-                  ? 'text-white'
+                  ? 'text-white shadow-md'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
               style={filter === 'all' ? { background: '#5f462d' } : {}}
@@ -332,13 +345,10 @@ export default function InboxPage() {
               All Messages
             </button>
             <button
-              onClick={() => {
-                console.log('🔍 [InboxPage] Filter changed to: unread')
-                setFilter('unread')
-              }}
+              onClick={() => setFilter('unread')}
               className={`px-4 py-2 rounded-lg font-medium transition-all ${
                 filter === 'unread'
-                  ? 'text-white'
+                  ? 'text-white shadow-md'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
               style={filter === 'unread' ? { background: '#5f462d' } : {}}
@@ -351,7 +361,7 @@ export default function InboxPage() {
             <button
               onClick={handleMarkAllAsRead}
               disabled={processing === 'all'}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition-all hover:scale-105 disabled:opacity-50"
             >
               <CheckCheck className="w-4 h-4" />
               Mark All Read
@@ -382,11 +392,8 @@ export default function InboxPage() {
                 : "You haven't received any category shares yet"}
             </p>
             <button
-              onClick={() => {
-                console.log('🔍 [InboxPage] Empty state Share button clicked')
-                setShowShareModal(true)
-              }}
-              className="px-6 py-3 rounded-lg text-white font-semibold hover:shadow-lg transition-all"
+              onClick={() => setShowShareModal(true)}
+              className="px-6 py-3 rounded-lg text-white font-semibold hover:shadow-lg transition-all hover:scale-105"
               style={{ background: '#5f462d' }}
             >
               Share a Category
@@ -399,6 +406,10 @@ export default function InboxPage() {
                 key={message.id}
                 className={`bg-white rounded-lg shadow-md p-6 transition-all hover:shadow-lg ${
                   !message.is_read ? 'border-l-4' : ''
+                } ${
+                  newMessageAnimation === message.id
+                    ? 'animate-pulse ring-4 ring-green-400'
+                    : ''
                 }`}
                 style={!message.is_read ? { borderColor: '#5f462d' } : {}}
               >
@@ -435,7 +446,7 @@ export default function InboxPage() {
                               message.sender_username}
                           </span>
                           {!message.is_read && (
-                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full animate-pulse">
                               NEW
                             </span>
                           )}
@@ -454,7 +465,7 @@ export default function InboxPage() {
                           <button
                             onClick={() => handleMarkAsRead(message.id)}
                             disabled={processing === message.id}
-                            className="p-2 rounded-lg hover:bg-green-50 text-green-600 transition-colors disabled:opacity-50"
+                            className="p-2 rounded-lg hover:bg-green-50 text-green-600 transition-all hover:scale-110 disabled:opacity-50"
                             title="Mark as read"
                           >
                             <MailOpen className="w-4 h-4" />
@@ -463,7 +474,7 @@ export default function InboxPage() {
                         <button
                           onClick={() => handleDelete(message.id)}
                           disabled={processing === message.id}
-                          className="p-2 rounded-lg hover:bg-red-50 text-red-600 transition-colors disabled:opacity-50"
+                          className="p-2 rounded-lg hover:bg-red-50 text-red-600 transition-all hover:scale-110 disabled:opacity-50"
                           title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -486,7 +497,7 @@ export default function InboxPage() {
                           href={message.category_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium transition-all hover:shadow-md"
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium transition-all hover:shadow-md hover:scale-105"
                           style={{ background: '#5f462d' }}
                         >
                           <ExternalLink className="w-4 h-4" />
@@ -511,13 +522,9 @@ export default function InboxPage() {
         )}
       </div>
 
-      {/* FIXED: Pass currentUsername to ShareCategoryModal */}
       <ShareCategoryModal
         show={showShareModal}
-        onClose={() => {
-          console.log('🔍 [InboxPage] Modal onClose triggered')
-          setShowShareModal(false)
-        }}
+        onClose={() => setShowShareModal(false)}
         currentUserId={dbUser.id}
       />
     </div>
