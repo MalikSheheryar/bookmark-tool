@@ -1,4 +1,4 @@
-// File: app/inbox/page.tsx
+// File: app/inbox/page.tsx (UPDATED with Reactions)
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
@@ -25,7 +25,15 @@ import {
   unsubscribeFromInbox,
   type InboxMessageWithSender,
 } from '@/lib/inbox-service'
+import {
+  getInboxMessageReactions,
+  toggleInboxMessageReaction,
+  subscribeToInboxMessageReactions,
+  type Reaction,
+} from '@/lib/reactions-service'
 import { ShareCategoryModal } from '@/components/share-category-modal'
+import { ReactionPicker } from '@/components/reaction-picker'
+import { ReactionDisplay } from '@/components/reaction-display'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
 export default function InboxPage() {
@@ -40,6 +48,14 @@ export default function InboxPage() {
   const [newMessageAnimation, setNewMessageAnimation] = useState<string | null>(
     null
   )
+
+  // ✅ NEW: Reactions state
+  const [messageReactions, setMessageReactions] = useState<
+    Record<string, Reaction[]>
+  >({})
+  const [reactionChannels, setReactionChannels] = useState<
+    Record<string, RealtimeChannel>
+  >({})
 
   // Use refs to track channels
   const newMessageChannelRef = useRef<RealtimeChannel | null>(null)
@@ -64,12 +80,68 @@ export default function InboxPage() {
       })
       console.log('✅ [InboxPage] Fetched', data.length, 'messages')
       setMessages(data)
+
+      // ✅ NEW: Fetch reactions for all messages
+      if (data.length > 0) {
+        fetchAllReactions(data.map((m) => m.id))
+      }
     } catch (error) {
       console.error('❌ [InboxPage] Fetch error:', error)
     } finally {
       setLoading(false)
     }
   }, [dbUser?.id, filter])
+
+  // ✅ NEW: Fetch reactions for all messages
+  const fetchAllReactions = async (messageIds: string[]) => {
+    if (!dbUser?.id) return
+
+    const reactionsMap: Record<string, Reaction[]> = {}
+
+    for (const messageId of messageIds) {
+      const reactions = await getInboxMessageReactions(messageId, dbUser.id)
+      reactionsMap[messageId] = reactions
+    }
+
+    setMessageReactions(reactionsMap)
+  }
+
+  // ✅ NEW: Setup realtime for reactions
+  const setupReactionRealtime = (messageId: string) => {
+    if (reactionChannels[messageId]) return // Already subscribed
+
+    const channel = subscribeToInboxMessageReactions(messageId, async () => {
+      if (!dbUser?.id) return
+      const reactions = await getInboxMessageReactions(messageId, dbUser.id)
+      setMessageReactions((prev) => ({
+        ...prev,
+        [messageId]: reactions,
+      }))
+    })
+
+    setReactionChannels((prev) => ({
+      ...prev,
+      [messageId]: channel,
+    }))
+  }
+
+  // ✅ NEW: Handle reaction toggle
+  const handleReactionToggle = async (messageId: string, emoji: string) => {
+    if (!dbUser?.id) return
+
+    try {
+      await toggleInboxMessageReaction(messageId, dbUser.id, emoji)
+
+      // Immediately refetch reactions for this message
+      const reactions = await getInboxMessageReactions(messageId, dbUser.id)
+      setMessageReactions((prev) => ({
+        ...prev,
+        [messageId]: reactions,
+      }))
+    } catch (error) {
+      console.error('❌ Error toggling reaction:', error)
+    }
+  }
 
   // Initial fetch
   useEffect(() => {
@@ -151,8 +223,20 @@ export default function InboxPage() {
       if (updateChannelRef.current) {
         unsubscribeFromInbox(updateChannelRef.current)
       }
+
+      // ✅ NEW: Cleanup reaction channels
+      Object.values(reactionChannels).forEach((channel) => {
+        channel.unsubscribe()
+      })
     }
   }, [dbUser?.id, fetchMessages])
+
+  // ✅ NEW: Setup reaction realtime for visible messages
+  useEffect(() => {
+    messages.forEach((message) => {
+      setupReactionRealtime(message.id)
+    })
+  }, [messages])
 
   // Request notification permission
   useEffect(() => {
@@ -508,12 +592,31 @@ export default function InboxPage() {
 
                     {/* Note */}
                     {message.note && (
-                      <div className="bg-blue-50 border-l-4 border-blue-400 p-3 rounded">
+                      <div className="bg-blue-50 border-l-4 border-blue-400 p-3 rounded mb-3">
                         <p className="text-sm text-gray-700 italic">
                           "{message.note}"
                         </p>
                       </div>
                     )}
+
+                    {/* ✅ NEW: Reactions Section */}
+                    <div className="flex items-center gap-3 pt-3 border-t border-gray-100">
+                      <ReactionPicker
+                        onSelect={(emoji) =>
+                          handleReactionToggle(message.id, emoji)
+                        }
+                      />
+
+                      {messageReactions[message.id] &&
+                        messageReactions[message.id].length > 0 && (
+                          <ReactionDisplay
+                            reactions={messageReactions[message.id]}
+                            onReactionClick={(emoji) =>
+                              handleReactionToggle(message.id, emoji)
+                            }
+                          />
+                        )}
+                    </div>
                   </div>
                 </div>
               </div>

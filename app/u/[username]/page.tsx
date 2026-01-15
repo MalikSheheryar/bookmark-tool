@@ -1,9 +1,10 @@
-// File: app/u/[username]/page.tsx
+// File: app/u/[username]/page.tsx (UPDATED with Reactions)
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useAuth } from '@/components/auth-provider'
 import {
   ArrowLeft,
   ExternalLink,
@@ -22,10 +23,20 @@ import {
   type PublicProfile,
   type PublicBookmark,
 } from '@/lib/public-profile-service'
+import {
+  getCategoryReactions,
+  toggleCategoryReaction,
+  subscribeToCategoryReactions,
+  type Reaction,
+} from '@/lib/reactions-service'
+import { ReactionPicker } from '@/components/reaction-picker'
+import { ReactionDisplay } from '@/components/reaction-display'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 
 export default function PublicProfilePage() {
   const params = useParams()
   const router = useRouter()
+  const { dbUser } = useAuth()
   const username = params.username as string
 
   const [profile, setProfile] = useState<PublicProfile | null>(null)
@@ -35,6 +46,14 @@ export default function PublicProfilePage() {
   const [loadingBookmarks, setLoadingBookmarks] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+
+  // ✅ NEW: Reactions state
+  const [categoryReactions, setCategoryReactions] = useState<
+    Record<string, Reaction[]>
+  >({})
+  const [reactionChannels, setReactionChannels] = useState<
+    Record<string, RealtimeChannel>
+  >({})
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -52,6 +71,11 @@ export default function PublicProfilePage() {
         // Auto-select first category
         if (data.public_categories && data.public_categories.length > 0) {
           setSelectedCategory(data.public_categories[0].name)
+        }
+
+        // ✅ NEW: Fetch reactions for all public categories
+        if (data.public_categories && data.public_categories.length > 0) {
+          fetchAllCategoryReactions(data.public_categories.map((c) => c.id))
         }
       } catch (err) {
         console.error('Error fetching profile:', err)
@@ -87,6 +111,77 @@ export default function PublicProfilePage() {
 
     fetchBookmarks()
   }, [selectedCategory, username])
+
+  // ✅ NEW: Fetch reactions for all categories
+  const fetchAllCategoryReactions = async (categoryIds: string[]) => {
+    const reactionsMap: Record<string, Reaction[]> = {}
+
+    for (const categoryId of categoryIds) {
+      const reactions = await getCategoryReactions(categoryId, dbUser?.id)
+      reactionsMap[categoryId] = reactions
+    }
+
+    setCategoryReactions(reactionsMap)
+  }
+
+  // ✅ NEW: Setup realtime for category reactions
+  const setupCategoryReactionRealtime = (categoryId: string) => {
+    if (reactionChannels[categoryId]) return // Already subscribed
+
+    const channel = subscribeToCategoryReactions(categoryId, async () => {
+      const reactions = await getCategoryReactions(categoryId, dbUser?.id)
+      setCategoryReactions((prev) => ({
+        ...prev,
+        [categoryId]: reactions,
+      }))
+    })
+
+    setReactionChannels((prev) => ({
+      ...prev,
+      [categoryId]: channel,
+    }))
+  }
+
+  // ✅ NEW: Handle category reaction toggle
+  const handleCategoryReactionToggle = async (
+    categoryId: string,
+    emoji: string
+  ) => {
+    if (!dbUser?.id) {
+      alert('Please log in to react')
+      return
+    }
+
+    try {
+      await toggleCategoryReaction(categoryId, dbUser.id, emoji)
+
+      // Immediately refetch reactions for this category
+      const reactions = await getCategoryReactions(categoryId, dbUser.id)
+      setCategoryReactions((prev) => ({
+        ...prev,
+        [categoryId]: reactions,
+      }))
+    } catch (error) {
+      console.error('❌ Error toggling category reaction:', error)
+      alert('Failed to add reaction. Please try again.')
+    }
+  }
+
+  // ✅ NEW: Setup realtime for visible categories
+  useEffect(() => {
+    if (!profile?.public_categories) return
+
+    profile.public_categories.forEach((category) => {
+      setupCategoryReactionRealtime(category.id)
+    })
+
+    // Cleanup
+    return () => {
+      Object.values(reactionChannels).forEach((channel) => {
+        channel.unsubscribe()
+      })
+    }
+  }, [profile?.public_categories])
 
   const handleShare = async () => {
     const url = window.location.href
@@ -173,7 +268,7 @@ export default function PublicProfilePage() {
         background: 'linear-gradient(135deg, #f5f5dc 0%, #f0f0e6 100%)',
       }}
     >
-      <div className="container mx-auto px-4 max-w-6xl">
+      <div className="container mx-auto mt-20 px-4 max-w-6xl">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <Link
@@ -314,41 +409,73 @@ export default function PublicProfilePage() {
                 </h2>
                 <div className="space-y-2">
                   {profile.public_categories.map((category) => (
-                    <button
-                      key={category.id}
-                      onClick={() => setSelectedCategory(category.name)}
-                      className={`w-full flex items-center justify-between p-3 rounded-lg transition-all ${
-                        selectedCategory === category.name
-                          ? 'shadow-md'
-                          : 'hover:bg-gray-50'
-                      }`}
-                      style={{
-                        background:
+                    <div key={category.id} className="space-y-2">
+                      <button
+                        onClick={() => setSelectedCategory(category.name)}
+                        className={`w-full flex items-center justify-between p-3 rounded-lg transition-all ${
                           selectedCategory === category.name
-                            ? '#5f462d'
-                            : 'transparent',
-                        color:
-                          selectedCategory === category.name ? 'white' : '#333',
-                      }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">
-                          {category.emoji || '📁'}
-                        </span>
-                        <span className="font-medium">{category.name}</span>
-                      </div>
-                      <span
-                        className="text-sm px-2 py-1 rounded-full"
+                            ? 'shadow-md'
+                            : 'hover:bg-gray-50'
+                        }`}
                         style={{
                           background:
                             selectedCategory === category.name
-                              ? 'rgba(255,255,255,0.2)'
-                              : 'rgba(95,70,45,0.1)',
+                              ? '#5f462d'
+                              : 'transparent',
+                          color:
+                            selectedCategory === category.name
+                              ? 'white'
+                              : '#333',
                         }}
                       >
-                        {category.bookmark_count}
-                      </span>
-                    </button>
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">
+                            {category.emoji || '📁'}
+                          </span>
+                          <span className="font-medium">{category.name}</span>
+                        </div>
+                        <span
+                          className="text-sm px-2 py-1 rounded-full"
+                          style={{
+                            background:
+                              selectedCategory === category.name
+                                ? 'rgba(255,255,255,0.2)'
+                                : 'rgba(95,70,45,0.1)',
+                          }}
+                        >
+                          {category.bookmark_count}
+                        </span>
+                      </button>
+
+                      {/* ✅ NEW: Reactions for category */}
+                      <div className="px-3 py-2 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <ReactionPicker
+                            onSelect={(emoji) =>
+                              handleCategoryReactionToggle(category.id, emoji)
+                            }
+                            disabled={!dbUser}
+                            className="flex-shrink-0"
+                          />
+                          {!dbUser && (
+                            <span className="text-xs text-gray-500">
+                              Login to react
+                            </span>
+                          )}
+                        </div>
+
+                        {categoryReactions[category.id] &&
+                          categoryReactions[category.id].length > 0 && (
+                            <ReactionDisplay
+                              reactions={categoryReactions[category.id]}
+                              onReactionClick={(emoji) =>
+                                handleCategoryReactionToggle(category.id, emoji)
+                              }
+                              maxDisplay={3}
+                            />
+                          )}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>

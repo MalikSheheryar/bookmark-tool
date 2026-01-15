@@ -194,11 +194,6 @@ export function InboxButton({ userId }: InboxButtonProps) {
       </div>
 
       <span className="hidden lg:inline group-hover:underline">Inbox</span>
-
-      {/* New message indicator dot (for extra visibility) */}
-      {!loading && unreadCount > 0 && (
-        <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-      )}
     </Link>
   )
 }
