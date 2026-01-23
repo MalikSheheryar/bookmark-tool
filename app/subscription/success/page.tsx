@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle, Loader2, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/components/auth-provider'
 
-export default function SubscriptionSuccessPage() {
+// ✅ Separate component that uses useSearchParams
+function SuccessContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { refreshUser, dbUser } = useAuth()
@@ -256,5 +257,28 @@ export default function SubscriptionSuccessPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// ✅ Main component with Suspense boundary
+export default function SubscriptionSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          className="min-h-screen flex items-center justify-center"
+          style={{
+            background: 'linear-gradient(135deg, #f5f5dc 0%, #f0f0e6 100%)',
+          }}
+        >
+          <Loader2
+            className="w-16 h-16 animate-spin"
+            style={{ color: '#5f462d' }}
+          />
+        </div>
+      }
+    >
+      <SuccessContent />
+    </Suspense>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Check,
@@ -15,7 +15,8 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/components/auth-provider'
 
-export default function SubscriptionPage() {
+// ✅ Separate component that uses useSearchParams
+function SubscriptionContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, dbUser, isLoading: authLoading, refreshUser } = useAuth()
@@ -26,17 +27,13 @@ export default function SubscriptionPage() {
 
   const canceled = searchParams.get('canceled')
 
-  // Enhanced refresh with API verification
   useEffect(() => {
     const refreshOnMount = async () => {
       console.log('\n🔄 ═══════ SUBSCRIPTION PAGE REFRESH ═══════')
-
       if (refreshUser) {
         console.log('🔄 Calling refreshUser...')
         await refreshUser()
       }
-
-      // Also check via API
       try {
         console.log('📡 Calling verification API...')
         const response = await fetch('/api/subscription/verify')
@@ -51,13 +48,10 @@ export default function SubscriptionPage() {
       } catch (error) {
         console.error('⚠️ API verification failed:', error)
       }
-
       console.log('════════════════════════════════════════════\n')
     }
 
     refreshOnMount()
-
-    // Auto-refresh every 5 seconds for first minute
     const interval = setInterval(refreshOnMount, 5000)
     const timeout = setTimeout(() => {
       clearInterval(interval)
@@ -83,7 +77,6 @@ export default function SubscriptionPage() {
         tier: dbUser.subscription_tier,
         status: dbUser.subscription_status,
       })
-
       setUserSubscription({
         tier: dbUser.subscription_tier || 'free',
         status: dbUser.subscription_status || 'inactive',
@@ -96,23 +89,18 @@ export default function SubscriptionPage() {
       router.push('/auth/login?redirect=/subscription')
       return
     }
-
     setLoading(planType)
     setError(null)
-
     try {
       const response = await fetch('/api/stripe/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ planType }),
       })
-
       const data = await response.json()
-
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create checkout session')
       }
-
       if (data.url) {
         window.location.href = data.url
       } else {
@@ -128,18 +116,14 @@ export default function SubscriptionPage() {
   const handleManageSubscription = async () => {
     setLoading('portal')
     setError(null)
-
     try {
       const response = await fetch('/api/stripe/create-portal-session', {
         method: 'POST',
       })
-
       const data = await response.json()
-
       if (!response.ok) {
         throw new Error(data.error || 'Failed to open billing portal')
       }
-
       window.location.href = data.url
     } catch (err: any) {
       console.error('Portal error:', err)
@@ -148,12 +132,10 @@ export default function SubscriptionPage() {
     }
   }
 
-  // Strict premium check
   const isPremium =
     userSubscription?.tier === 'premium' &&
     userSubscription?.status === 'active'
 
-  // Show loading state while auth is loading
   if (authLoading || !userSubscription) {
     return (
       <div
@@ -170,7 +152,6 @@ export default function SubscriptionPage() {
     )
   }
 
-  // PREMIUM USER VIEW - Only show management section
   if (isPremium) {
     return (
       <div
@@ -180,7 +161,6 @@ export default function SubscriptionPage() {
         }}
       >
         <div className="max-w-4xl mx-auto px-4 py-12">
-          {/* Header */}
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-100 to-orange-100 px-6 py-3 rounded-full mb-6 shadow-lg border-2 border-amber-300">
               <Crown className="w-6 h-6 text-amber-600" />
@@ -188,7 +168,6 @@ export default function SubscriptionPage() {
                 Premium Member
               </span>
             </div>
-
             <h1
               className="text-4xl md:text-5xl font-bold mb-4"
               style={{ color: '#5f462d' }}
@@ -200,7 +179,6 @@ export default function SubscriptionPage() {
             </p>
           </div>
 
-          {/* Error Message */}
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
               <X className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
@@ -216,17 +194,13 @@ export default function SubscriptionPage() {
             </div>
           )}
 
-          {/* Premium Status Card */}
           <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl shadow-xl p-8 md:p-12 border-2 border-green-300 mb-8">
             <div className="flex flex-col md:flex-row items-center gap-8">
-              {/* Icon Section */}
               <div className="flex-shrink-0">
                 <div className="w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg">
                   <Star className="w-12 h-12 text-white" />
                 </div>
               </div>
-
-              {/* Content Section */}
               <div className="flex-1 text-center md:text-left">
                 <h2 className="text-3xl font-bold text-green-800 mb-3">
                   Premium Active
@@ -236,8 +210,6 @@ export default function SubscriptionPage() {
                   unlimited bookmarks, 750+ premium emojis, and unlimited
                   private categories.
                 </p>
-
-                {/* Features Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   <div className="flex items-center gap-2 text-green-700">
                     <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
@@ -252,8 +224,6 @@ export default function SubscriptionPage() {
                     <span className="font-medium">Unlimited Categories</span>
                   </div>
                 </div>
-
-                {/* Manage Button */}
                 <button
                   onClick={handleManageSubscription}
                   disabled={loading === 'portal'}
@@ -276,7 +246,6 @@ export default function SubscriptionPage() {
             </div>
           </div>
 
-          {/* Additional Info Card */}
           <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
             <h3 className="text-xl font-bold mb-4" style={{ color: '#5f462d' }}>
               What You Can Do
@@ -333,7 +302,6 @@ export default function SubscriptionPage() {
     )
   }
 
-  // FREE USER VIEW - Show pricing plans
   return (
     <div
       className="min-h-screen pt-20"
@@ -342,7 +310,6 @@ export default function SubscriptionPage() {
       }}
     >
       <div className="max-w-6xl mx-auto px-4 py-12">
-        {/* Header */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 bg-white/60 backdrop-blur-sm px-4 py-2 rounded-full mb-6 shadow-sm">
             <Crown className="w-4 h-4" style={{ color: '#5f462d' }} />
@@ -350,7 +317,6 @@ export default function SubscriptionPage() {
               Unlock Premium Features
             </span>
           </div>
-
           <h1
             className="text-4xl md:text-5xl font-bold mb-4"
             style={{ color: '#5f462d' }}
@@ -363,7 +329,6 @@ export default function SubscriptionPage() {
           </p>
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="max-w-2xl mx-auto mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
             <X className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
@@ -379,9 +344,7 @@ export default function SubscriptionPage() {
           </div>
         )}
 
-        {/* Pricing Cards */}
         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-12">
-          {/* Free Plan */}
           <div className="bg-white rounded-2xl shadow-lg p-8 border-2 border-gray-200">
             <div className="text-center mb-6">
               <Sparkles
@@ -402,7 +365,6 @@ export default function SubscriptionPage() {
               </div>
               <p className="text-gray-600">Forever free</p>
             </div>
-
             <ul className="space-y-3 mb-8">
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
@@ -421,7 +383,6 @@ export default function SubscriptionPage() {
                 <span className="text-gray-700">Cloud sync</span>
               </li>
             </ul>
-
             <button
               disabled
               className="w-full py-3 px-6 rounded-lg font-semibold bg-gray-200 text-gray-500 cursor-not-allowed"
@@ -430,12 +391,10 @@ export default function SubscriptionPage() {
             </button>
           </div>
 
-          {/* Monthly Plan */}
           <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl shadow-xl p-8 border-2 border-amber-300 relative overflow-hidden">
             <div className="absolute top-4 right-4 bg-amber-500 text-white px-3 py-1 rounded-full text-xs font-bold">
               POPULAR
             </div>
-
             <div className="text-center mb-6">
               <Zap className="w-12 h-12 mx-auto mb-4 text-amber-600" />
               <h3
@@ -455,7 +414,6 @@ export default function SubscriptionPage() {
               </div>
               <p className="text-gray-600">Billed monthly</p>
             </div>
-
             <ul className="space-y-3 mb-8">
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
@@ -482,7 +440,6 @@ export default function SubscriptionPage() {
                 </span>
               </li>
             </ul>
-
             <button
               onClick={() => handleSubscribe('monthly')}
               disabled={loading === 'monthly'}
@@ -506,13 +463,11 @@ export default function SubscriptionPage() {
           </div>
         </div>
 
-        {/* Yearly Plan - Full Width */}
         <div className="max-w-4xl mx-auto mb-12">
           <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl shadow-xl p-8 border-2 border-purple-300 relative overflow-hidden">
             <div className="absolute top-4 right-4 bg-purple-500 text-white px-3 py-1 rounded-full text-xs font-bold">
               BEST VALUE - SAVE 18%
             </div>
-
             <div className="grid md:grid-cols-2 gap-8 items-center">
               <div>
                 <Crown className="w-12 h-12 mb-4 text-purple-600" />
@@ -536,7 +491,6 @@ export default function SubscriptionPage() {
                   Save £8.88 compared to monthly
                 </p>
               </div>
-
               <div>
                 <ul className="space-y-3 mb-6">
                   <li className="flex items-start gap-3">
@@ -558,7 +512,6 @@ export default function SubscriptionPage() {
                     </span>
                   </li>
                 </ul>
-
                 <button
                   onClick={() => handleSubscribe('yearly')}
                   disabled={loading === 'yearly'}
@@ -584,7 +537,6 @@ export default function SubscriptionPage() {
           </div>
         </div>
 
-        {/* Trust Badges */}
         <div className="mt-16 text-center">
           <p className="text-sm text-gray-500 mb-4">
             Trusted by bookmark enthusiasts worldwide
@@ -606,5 +558,28 @@ export default function SubscriptionPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// ✅ Main component with Suspense boundary
+export default function SubscriptionPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          className="min-h-screen pt-20 flex items-center justify-center"
+          style={{
+            background: 'linear-gradient(135deg, #f5f5dc 0%, #f0f0e6 100%)',
+          }}
+        >
+          <Loader2
+            className="w-8 h-8 animate-spin"
+            style={{ color: '#5f462d' }}
+          />
+        </div>
+      }
+    >
+      <SubscriptionContent />
+    </Suspense>
   )
 }

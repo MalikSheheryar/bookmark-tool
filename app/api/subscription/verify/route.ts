@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerClient } from '@/lib/supabase-server'
 
+// ✅ Force dynamic rendering - prevents static generation error
+export const dynamic = 'force-dynamic'
+
 export async function GET(req: NextRequest) {
   console.log('\n🔍 ═══════ VERIFICATION API CALLED ═══════')
   console.log('⏰ Time:', new Date().toISOString())
