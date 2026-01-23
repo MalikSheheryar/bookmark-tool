@@ -1,14 +1,5 @@
 import Stripe from 'stripe'
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is not set')
-}
-
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2024-11-20.acacia',
-  typescript: true,
-})
-
 // ✅ FIXED: Store actual Stripe amounts in USD
 // UI will display in GBP (£3.99, £39) but backend uses USD
 export const STRIPE_PLANS = {
@@ -31,3 +22,36 @@ export const STRIPE_PLANS = {
 } as const
 
 export type PlanType = keyof typeof STRIPE_PLANS
+
+// ✅ Lazy initialization - only creates Stripe when actually used at RUNTIME
+let stripeInstance: Stripe | null = null
+
+function getStripeInstance(): Stripe {
+  if (!stripeInstance) {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error('STRIPE_SECRET_KEY is not set')
+    }
+
+    stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2024-11-20.acacia',
+      typescript: true,
+    })
+  }
+
+  return stripeInstance
+}
+
+// ✅ Export a Proxy that looks like Stripe but only initializes when accessed
+export const stripe = new Proxy({} as Stripe, {
+  get: (target, prop) => {
+    const instance = getStripeInstance()
+    const value = instance[prop as keyof Stripe]
+
+    // If it's a function, bind it to the instance
+    if (typeof value === 'function') {
+      return value.bind(instance)
+    }
+
+    return value
+  },
+})
