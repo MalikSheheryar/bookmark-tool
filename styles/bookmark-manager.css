@@ -22,7 +22,11 @@
 }
 
 body {
-  font-family: 'Tektur', system-ui, -apple-system, sans-serif;
+  font-family:
+    'Tektur',
+    system-ui,
+    -apple-system,
+    sans-serif;
   background: linear-gradient(135deg, var(--secondary-color) 0%, #f0f0e6 100%);
   margin: 0;
   padding: 0;
@@ -59,7 +63,8 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 20% 80%,
       rgba(255, 255, 255, 0.1) 0%,
       transparent 50%
@@ -913,7 +918,7 @@ body {
   display: flex;
   align-items: center;
   font-weight: 500;
-  transform: translateX(600px);
+  transform: translateX(850px);
   transition: var(--transition);
 }
 

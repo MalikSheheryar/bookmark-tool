@@ -6,7 +6,7 @@ import { InboxButton } from '@/components/inbox-button'
 import { signOut } from '@/lib/auth'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import { LogOut, User, Bookmark, Mail } from 'lucide-react'
+import { LogOut, User, Bookmark, Crown, Sparkles } from 'lucide-react'
 
 export function Navbar() {
   const router = useRouter()
@@ -25,6 +25,9 @@ export function Navbar() {
 
   const isAuthPage = pathname?.startsWith('/auth/')
   const isDemoPage = pathname === '/demo'
+  const isPremium =
+    dbUser?.subscription_tier === 'premium' &&
+    dbUser?.subscription_status === 'active'
 
   return (
     <nav
@@ -67,6 +70,7 @@ export function Navbar() {
                   <InboxButton userId={dbUser.id} />
                 </div>
 
+                {/* Dashboard Link */}
                 {!isDemoPage && (
                   <Link
                     href="/dashboard"
@@ -79,6 +83,33 @@ export function Navbar() {
                   </Link>
                 )}
 
+                {/* Subscription Link */}
+                <Link
+                  href="/subscription"
+                  className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-all ${
+                    isPremium
+                      ? 'bg-gradient-to-r from-amber-100 to-orange-100 border-2 border-amber-300 hover:from-amber-200 hover:to-orange-200'
+                      : 'hover:bg-white/50'
+                  }`}
+                  style={{ color: '#5f462d' }}
+                  title={isPremium ? 'Premium Member' : 'Upgrade to Premium'}
+                >
+                  {isPremium ? (
+                    <>
+                      <Crown className="w-5 h-5 text-amber-600" />
+                      <span className="hidden lg:inline font-semibold">
+                        Premium
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-5 h-5" />
+                      <span className="hidden lg:inline">Upgrade</span>
+                    </>
+                  )}
+                </Link>
+
+                {/* Profile Link */}
                 <Link
                   href="/profile"
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-all hover:bg-white/50"
@@ -89,6 +120,7 @@ export function Navbar() {
                   <span className="hidden lg:inline">Profile</span>
                 </Link>
 
+                {/* Sign Out Button */}
                 <button
                   onClick={handleLogout}
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-white transition-all duration-200 hover:opacity-90 hover:shadow-md"
@@ -103,6 +135,17 @@ export function Navbar() {
               <>
                 {!isAuthPage && (
                   <>
+                    {/* Subscription Link for Guests */}
+                    <Link
+                      href="/subscription"
+                      className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-all hover:bg-white/50"
+                      style={{ color: '#5f462d' }}
+                    >
+                      <Sparkles className="w-5 h-5" />
+                      <span>Pricing</span>
+                    </Link>
+
+                    {/* Sign In Link */}
                     <Link
                       href="/auth/login"
                       className="px-4 py-2 rounded-lg font-medium transition-all hover:bg-white/50"
@@ -111,6 +154,8 @@ export function Navbar() {
                       <span className="hidden sm:inline">Sign In</span>
                       <span className="sm:hidden">Login</span>
                     </Link>
+
+                    {/* Sign Up Button */}
                     <Link
                       href="/auth/signup"
                       className="px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 hover:opacity-90 hover:shadow-md"

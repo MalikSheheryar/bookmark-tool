@@ -17,6 +17,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   logout: () => Promise<void>
   refetchUser: () => Promise<void>
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -43,10 +44,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log(
         '🔍 ensureUserInDatabase: Querying database for auth_id:',
-        authUser.id
+        authUser.id,
       )
 
-      // Add timeout to prevent hanging
       const queryPromise = supabase
         .from('users')
         .select('*')
@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle()
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Database query timeout')), 5000)
+        setTimeout(() => reject(new Error('Database query timeout')), 5000),
       )
 
       const { data: existingUser, error: queryError } = (await Promise.race([
@@ -70,13 +70,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (existingUser) {
         console.log(
           '✅ ensureUserInDatabase: User exists in DB:',
-          existingUser.id
+          existingUser.id,
         )
+        console.log('📊 User subscription status:', {
+          tier: existingUser.subscription_tier,
+          status: existingUser.subscription_status,
+          stripeCustomer: existingUser.stripe_customer_id,
+          stripeSubscription: existingUser.stripe_subscription_id,
+        })
         return existingUser
       }
 
       console.log(
-        '🔧 ensureUserInDatabase: User not found, creating new user...'
+        '🔧 ensureUserInDatabase: User not found, creating new user...',
       )
       const { data: newUser, error: insertError } = await supabase
         .from('users')
@@ -110,14 +116,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     console.log('🎬 AuthProvider: Effect running for path:', pathname)
 
-    // Skip on callback page
     if (pathname === '/auth/callback') {
       console.log('🚫 AuthProvider: On callback page - standing down')
       setIsLoading(false)
       return
     }
 
-    // Check for password recovery
     if (typeof window !== 'undefined') {
       const hash = window.location.hash
       const isOnResetPage = pathname === '/auth/reset-password'
@@ -140,7 +144,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const supabase = createClient()
 
-    // Auth state change listener
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -150,12 +153,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         '🔄 AuthProvider: Auth state changed:',
         event,
         'User:',
-        session?.user?.id
+        session?.user?.id,
       )
 
       if (!isMounted) return
 
-      // Password recovery
       if (
         event === 'PASSWORD_RECOVERY' ||
         (event === 'SIGNED_IN' && pathname === '/auth/reset-password')
@@ -171,7 +173,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      // Sign out
       if (event === 'SIGNED_OUT') {
         console.log('🚪 AuthProvider: User signed out')
         isPasswordRecoveryRef.current = false
@@ -181,24 +182,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      // Sign in / session update
       if (!isPasswordRecoveryRef.current) {
         const newUser = session?.user || null
         console.log('👤 AuthProvider: Setting user:', newUser?.id || 'none')
         setUser(newUser)
 
-        // CRITICAL: Set loading to false IMMEDIATELY
         console.log('🏁 AuthProvider: Setting isLoading to FALSE (immediate)')
         setIsLoading(false)
 
-        // Then try to get DB user in background
         if (newUser) {
           console.log('🔧 AuthProvider: Fetching DB user in background...')
           ensureUserInDatabase(newUser)
             .then((dbUserData) => {
               console.log(
                 '✅ AuthProvider: DB user result:',
-                dbUserData?.id || 'null'
+                dbUserData?.id || 'null',
               )
               if (isMounted) {
                 setDbUser(dbUserData)
@@ -216,7 +214,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })
 
-    // Initial session check
     console.log('🔍 AuthProvider: Checking initial session...')
     supabase.auth
       .getSession()
@@ -238,19 +235,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const authUser = session?.user || null
         setUser(authUser)
 
-        // CRITICAL: Set loading to false IMMEDIATELY
         console.log('🏁 AuthProvider: Setting isLoading to FALSE (initial)')
         setIsLoading(false)
 
         if (authUser) {
           console.log(
-            '👤 AuthProvider: Initial user found, fetching DB user in background...'
+            '👤 AuthProvider: Initial user found, fetching DB user in background...',
           )
           ensureUserInDatabase(authUser)
             .then((dbUserData) => {
               console.log(
                 '✅ AuthProvider: Initial DB user:',
-                dbUserData?.id || 'null'
+                dbUserData?.id || 'null',
               )
               if (isMounted) {
                 setDbUser(dbUserData)
@@ -294,6 +290,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // ✅ FIXED: refreshUser with proper supabase client
+  const refreshUser = async () => {
+    try {
+      if (!user) {
+        console.log('⚠️ refreshUser: No user to refresh')
+        return
+      }
+
+      console.log('🔄 refreshUser: Starting refresh for user:', user.id)
+
+      // ✅ CREATE SUPABASE CLIENT
+      const supabase = createClient()
+
+      const { data: freshUserData, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_id', user.id)
+        .single()
+
+      if (error) {
+        console.error('❌ refreshUser: Database error:', error)
+        return
+      }
+
+      console.log('✅ refreshUser: User data refreshed successfully')
+      console.log('📊 refreshUser: Subscription details:', {
+        id: freshUserData.id,
+        email: freshUserData.email,
+        tier: freshUserData.subscription_tier,
+        status: freshUserData.subscription_status,
+        stripeCustomerId: freshUserData.stripe_customer_id,
+        stripeSubscriptionId: freshUserData.stripe_subscription_id,
+        subscriptionEndDate: freshUserData.subscription_end_date,
+      })
+
+      setDbUser(freshUserData)
+    } catch (error) {
+      console.error('❌ refreshUser: Unexpected error:', error)
+    }
+  }
+
   const refetchUser = async () => {
     if (!isPasswordRecoveryRef.current && pathname !== '/auth/callback') {
       const supabase = createClient()
@@ -316,13 +353,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!user && !isPasswordRecoveryRef.current,
     logout,
     refetchUser,
+    refreshUser,
   }
 
-  console.log('📤 AuthProvider: Context:', {
+  console.log('📤 AuthProvider: Context state:', {
     hasUser: !!user,
     userId: user?.id,
     hasDbUser: !!dbUser,
     dbUserId: dbUser?.id,
+    dbUserTier: dbUser?.subscription_tier,
+    dbUserStatus: dbUser?.subscription_status,
     isLoading,
     isAuthenticated: value.isAuthenticated,
   })

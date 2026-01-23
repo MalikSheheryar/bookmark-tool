@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { useSubscription, FREE_TIER_LIMITS } from '@/hooks/use-subscription'
 
 export interface Bookmark {
   siteName: string
@@ -44,15 +45,23 @@ interface UseBookmarkManagerHybridOptions {
     oldName: string,
     newName: string,
     emoji: string | null,
-    isPublic?: boolean
+    isPublic?: boolean,
   ) => Promise<void>
 }
 
 const GUEST_STORAGE_KEY = 'bookmarkData_guest'
 
 export function useBookmarkManagerHybrid(
-  options: UseBookmarkManagerHybridOptions = {}
+  options: UseBookmarkManagerHybridOptions = {},
 ) {
+  // UPDATED: Import new subscription functions
+  const {
+    canCreateBookmark,
+    getRemainingBookmarks,
+    canCreatePrivateCategory,
+    isPremium,
+  } = useSubscription()
+
   const [bookmarkData, setBookmarkData] = useState<BookmarkData>({
     categories: {},
     categoryOrder: [],
@@ -84,12 +93,19 @@ export function useBookmarkManagerHybrid(
   const [editingCategory, setEditingCategory] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<any>(null)
   const [deleteType, setDeleteType] = useState<'category' | 'bookmark' | null>(
-    null
+    null,
   )
   const [isDataLoaded, setIsDataLoaded] = useState(false)
 
   const toastTimeoutRef = useRef<NodeJS.Timeout>()
   const previousUserIdRef = useRef<string | undefined>(options.userId)
+
+  // NEW: Helper function to count private categories
+  const getPrivateCategoryCount = useCallback(() => {
+    return Object.entries(bookmarkData.categoryPublicStatus).filter(
+      ([_, isPublic]) => !isPublic,
+    ).length
+  }, [bookmarkData.categoryPublicStatus])
 
   // Load data on mount and when user changes
   useEffect(() => {
@@ -181,7 +197,7 @@ export function useBookmarkManagerHybrid(
       console.log(
         '✅ Loaded categories:',
         categories?.length || 0,
-        'categories'
+        'categories',
       )
 
       console.log('🔍 Fetching bookmarks for user:', options.userId)
@@ -287,7 +303,7 @@ export function useBookmarkManagerHybrid(
         setToast((prev) => ({ ...prev, show: false }))
       }, 3000)
     },
-    []
+    [],
   )
 
   const validateBookmarkName = (name: string): boolean => {
@@ -322,6 +338,20 @@ export function useBookmarkManagerHybrid(
 
   const addBookmark = useCallback(
     async (formData: { name: string; url: string; category: string }) => {
+      // Count current bookmarks
+      const totalBookmarks = Object.values(bookmarkData.categories).reduce(
+        (sum, bookmarks) => sum + bookmarks.length,
+        0,
+      )
+
+      if (!canCreateBookmark(totalBookmarks)) {
+        showToast(
+          `Free tier limited to ${FREE_TIER_LIMITS.maxBookmarks} bookmarks. Upgrade to Premium for unlimited bookmarks!`,
+          'error',
+        )
+        return false
+      }
+
       if (
         !validateBookmarkName(formData.name) ||
         !validateURL(formData.url) ||
@@ -383,19 +413,20 @@ export function useBookmarkManagerHybrid(
       showToast('Bookmark added successfully!')
       return true
     },
-    [options, showModal, showToast]
+    [bookmarkData.categories, canCreateBookmark, options, showModal, showToast],
   )
 
+  // UPDATED: createOrUpdateCategory with private category limit check
   const createOrUpdateCategory = useCallback(
     async (
       name: string,
       editingCategoryName?: string | null,
-      isPublic: boolean = false
+      isPublic: boolean = false,
     ) => {
       if (!validateCategoryName(name)) {
         showToast(
           'Category name must be 2-30 characters long and contain only letters, numbers, and spaces.',
-          'error'
+          'error',
         )
         return false
       }
@@ -407,6 +438,18 @@ export function useBookmarkManagerHybrid(
       if (bookmarkData.categories[name]) {
         showToast('Category already exists!', 'error')
         return false
+      }
+
+      // NEW: Check private category limit for free users
+      if (!isPublic && !isPremium) {
+        const currentPrivateCount = getPrivateCategoryCount()
+        if (!canCreatePrivateCategory(currentPrivateCount)) {
+          showToast(
+            `Free tier limited to ${FREE_TIER_LIMITS.maxPrivateCategories} private category. Upgrade to Premium for unlimited private categories!`,
+            'error',
+          )
+          return false
+        }
       }
 
       const newOrder = bookmarkData.categoryOrder.length
@@ -471,9 +514,19 @@ export function useBookmarkManagerHybrid(
       showToast(`Category "${name}" created successfully!`)
       return true
     },
-    [bookmarkData, selectedEmoji, closeModal, showToast, options]
+    [
+      bookmarkData,
+      selectedEmoji,
+      closeModal,
+      showToast,
+      options,
+      isPremium,
+      canCreatePrivateCategory,
+      getPrivateCategoryCount,
+    ],
   )
 
+  // UPDATED: updateCategory with private category limit check
   const updateCategory = useCallback(
     async (oldName: string, newName: string, isPublic?: boolean) => {
       const currentIsPublic = bookmarkData.categoryPublicStatus[oldName]
@@ -492,7 +545,7 @@ export function useBookmarkManagerHybrid(
         if (!validateCategoryName(newName)) {
           showToast(
             'Category name must be 2-30 characters long and contain only letters, numbers, and spaces.',
-            'error'
+            'error',
           )
           return false
         }
@@ -500,6 +553,24 @@ export function useBookmarkManagerHybrid(
         if (bookmarkData.categories[newName]) {
           showToast('Category name already exists!', 'error')
           return false
+        }
+      }
+
+      // NEW: Check if changing from public to private would exceed limit
+      if (isPublic !== undefined && !isPremium) {
+        const wasPublic = currentIsPublic
+        const becomingPrivate = !isPublic
+
+        // If changing from public to private, check the limit
+        if (wasPublic && becomingPrivate) {
+          const currentPrivateCount = getPrivateCategoryCount()
+          if (!canCreatePrivateCategory(currentPrivateCount)) {
+            showToast(
+              `Free tier limited to ${FREE_TIER_LIMITS.maxPrivateCategories} private category. Upgrade to Premium for unlimited private categories!`,
+              'error',
+            )
+            return false
+          }
         }
       }
 
@@ -516,7 +587,7 @@ export function useBookmarkManagerHybrid(
             oldName,
             newName,
             selectedEmoji,
-            isPublic
+            isPublic,
           )
           console.log('✅ Category updated successfully')
         } catch (error: any) {
@@ -598,7 +669,16 @@ export function useBookmarkManagerHybrid(
       showToast('Category updated successfully!')
       return true
     },
-    [bookmarkData, selectedEmoji, closeModal, showToast, options]
+    [
+      bookmarkData,
+      selectedEmoji,
+      closeModal,
+      showToast,
+      options,
+      isPremium,
+      canCreatePrivateCategory,
+      getPrivateCategoryCount,
+    ],
   )
 
   const deleteCategory = useCallback(
@@ -627,7 +707,7 @@ export function useBookmarkManagerHybrid(
         const updatedData = {
           categories: newCategories,
           categoryOrder: prev.categoryOrder.filter(
-            (cat) => cat !== categoryName
+            (cat) => cat !== categoryName,
           ),
           categoryEmojis: newEmojis,
           categoryPublicStatus: newPublicStatus,
@@ -648,7 +728,7 @@ export function useBookmarkManagerHybrid(
 
       showToast(`Category "${categoryName}" deleted successfully!`)
     },
-    [options, showToast]
+    [options, showToast],
   )
 
   const deleteBookmark = useCallback(
@@ -673,7 +753,7 @@ export function useBookmarkManagerHybrid(
           categories: {
             ...prev.categories,
             [categoryName]: prev.categories[categoryName].filter(
-              (_, index) => index !== bookmarkIndex
+              (_, index) => index !== bookmarkIndex,
             ),
           },
         }
@@ -682,7 +762,7 @@ export function useBookmarkManagerHybrid(
         if (!options.userId && typeof window !== 'undefined') {
           try {
             console.log(
-              '💾 Immediately saving bookmark deletion to localStorage'
+              '💾 Immediately saving bookmark deletion to localStorage',
             )
             localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(updatedData))
           } catch (error) {
@@ -695,7 +775,7 @@ export function useBookmarkManagerHybrid(
 
       showToast(`"${bookmark.siteName}" deleted successfully!`)
     },
-    [bookmarkData.categories, options, showToast]
+    [bookmarkData.categories, options, showToast],
   )
 
   const toggleCategory = useCallback(() => {}, [])
@@ -706,7 +786,7 @@ export function useBookmarkManagerHybrid(
       setSelectedEmoji(bookmarkData.categoryEmojis[categoryName] || null)
       showModal('categoryModal')
     },
-    [bookmarkData.categoryEmojis, showModal]
+    [bookmarkData.categoryEmojis, showModal],
   )
 
   const shareCategory = useCallback(
@@ -739,7 +819,7 @@ export function useBookmarkManagerHybrid(
         showToast('Error creating share link. Please try again.', 'error')
       }
     },
-    [bookmarkData, showModal, showToast]
+    [bookmarkData, showModal, showToast],
   )
 
   const reorderCategories = useCallback(
@@ -766,7 +846,7 @@ export function useBookmarkManagerHybrid(
         return updatedData
       })
     },
-    [options.userId]
+    [options.userId],
   )
 
   const toggleCategoryVisibility = useCallback(
@@ -774,6 +854,19 @@ export function useBookmarkManagerHybrid(
       const currentStatus =
         bookmarkData.categoryPublicStatus[categoryName] || false
       const newStatus = !currentStatus
+
+      // NEW: Check private category limit when toggling from public to private
+      if (!newStatus && !isPremium) {
+        const currentPrivateCount = getPrivateCategoryCount()
+        // Don't count the current category since it's currently public
+        if (!canCreatePrivateCategory(currentPrivateCount)) {
+          showToast(
+            `Free tier limited to ${FREE_TIER_LIMITS.maxPrivateCategories} private category. Upgrade to Premium for unlimited private categories!`,
+            'error',
+          )
+          return
+        }
+      }
 
       if (options.userId) {
         try {
@@ -798,7 +891,7 @@ export function useBookmarkManagerHybrid(
 
           showToast(
             `Category is now ${newStatus ? 'public' : 'private'}!`,
-            'success'
+            'success',
           )
         } catch (error) {
           console.error('Error toggling visibility:', error)
@@ -821,11 +914,18 @@ export function useBookmarkManagerHybrid(
         })
         showToast(
           `Category is now ${newStatus ? 'public' : 'private'}!`,
-          'success'
+          'success',
         )
       }
     },
-    [bookmarkData.categoryPublicStatus, options.userId, showToast]
+    [
+      bookmarkData.categoryPublicStatus,
+      options.userId,
+      showToast,
+      isPremium,
+      canCreatePrivateCategory,
+      getPrivateCategoryCount,
+    ],
   )
 
   return {
@@ -851,5 +951,12 @@ export function useBookmarkManagerHybrid(
     reorderCategories,
     setSelectedEmoji,
     toggleCategoryVisibility,
+    remainingBookmarks: getRemainingBookmarks(
+      Object.values(bookmarkData.categories).reduce(
+        (sum, b) => sum + b.length,
+        0,
+      ),
+    ),
+    getPrivateCategoryCount, // NEW: Export this helper function
   }
 }

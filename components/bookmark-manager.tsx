@@ -39,6 +39,7 @@ export default function BookmarkManager() {
     reorderCategories,
     setSelectedEmoji,
     toggleCategoryVisibility, // ← ADD THIS LINE
+    getPrivateCategoryCount, // NEW: Import this
   } = useBookmarkManagerHybrid({
     userId: dbUser?.id,
     onSyncBookmark: dbUser?.id
@@ -139,7 +140,7 @@ export default function BookmarkManager() {
             if (categoryError) {
               console.error(
                 '❌ Supabase error updating category:',
-                categoryError
+                categoryError,
               )
               throw categoryError
             }
@@ -156,7 +157,7 @@ export default function BookmarkManager() {
               if (bookmarkError) {
                 console.error(
                   '❌ Supabase error updating bookmarks:',
-                  bookmarkError
+                  bookmarkError,
                 )
                 throw bookmarkError
               }
@@ -223,7 +224,7 @@ export default function BookmarkManager() {
             if (bookmarkError) {
               console.error(
                 '❌ Supabase error deleting bookmarks:',
-                bookmarkError
+                bookmarkError,
               )
               throw bookmarkError
             }
@@ -237,13 +238,13 @@ export default function BookmarkManager() {
             if (categoryError) {
               console.error(
                 '❌ Supabase error deleting category:',
-                categoryError
+                categoryError,
               )
               throw categoryError
             }
 
             console.log(
-              '✅ Category and bookmarks deleted successfully from database'
+              '✅ Category and bookmarks deleted successfully from database',
             )
           } catch (error) {
             console.error('❌ Error deleting category:', error)
@@ -347,6 +348,7 @@ export default function BookmarkManager() {
         selectedEmoji={selectedEmoji}
         onEmojiSelect={setSelectedEmoji}
         editingCategory={editingCategory}
+        currentPrivateCategoryCount={getPrivateCategoryCount()} // NEW: Add this prop
         currentIsPublic={
           editingCategory
             ? bookmarkData.categoryPublicStatus[editingCategory] || false
