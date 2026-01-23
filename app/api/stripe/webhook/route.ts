@@ -3,16 +3,19 @@ import { stripe } from '@/lib/stripe'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
+// ✅ Lazy-load Supabase admin client
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
     },
-  },
-)
+  )
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.text()
@@ -113,6 +116,8 @@ export async function POST(req: NextRequest) {
 async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session,
 ) {
+  const supabaseAdmin = getSupabaseAdmin()
+
   console.log('📦 Full session object:', JSON.stringify(session, null, 2))
 
   const userId = session.metadata?.userId
@@ -216,6 +221,7 @@ async function handleCheckoutSessionCompleted(
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+  const supabaseAdmin = getSupabaseAdmin()
   const userId = subscription.metadata?.userId
 
   console.log('🔍 Subscription metadata:')
@@ -248,6 +254,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+  const supabaseAdmin = getSupabaseAdmin()
   const userId = subscription.metadata?.userId
 
   console.log('🔍 Deletion metadata:')
@@ -291,6 +298,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 }
 
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
+  const supabaseAdmin = getSupabaseAdmin()
   const subscriptionId = invoice.subscription as string
 
   if (!subscriptionId) return
@@ -320,6 +328,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 }
 
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
+  const supabaseAdmin = getSupabaseAdmin()
   const subscriptionId = invoice.subscription as string
 
   if (!subscriptionId) return
