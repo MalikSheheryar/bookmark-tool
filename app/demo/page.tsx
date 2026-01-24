@@ -1,4 +1,4 @@
-import BookmarkManager from '../../components/bookmark-manager'
+import BookmarkManager from '../../components/bookmark-manager-demo'
 
 export const metadata = {
   title: 'Demo - Bookmark Manager',

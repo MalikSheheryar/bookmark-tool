@@ -84,7 +84,7 @@ export function InboxButton({ userId }: InboxButtonProps) {
 
         // Verify with server after 500ms
         setTimeout(fetchCount, 500)
-      }
+      },
     )
 
     // Subscribe to message UPDATES (when marked as read, decrement count)
@@ -101,7 +101,7 @@ export function InboxButton({ userId }: InboxButtonProps) {
           // Verify with server after 500ms
           setTimeout(fetchCount, 500)
         }
-      }
+      },
     )
 
     console.log('✅ [InboxButton] Realtime subscriptions active')
@@ -155,7 +155,7 @@ export function InboxButton({ userId }: InboxButtonProps) {
   return (
     <Link
       href="/inbox"
-      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-all hover:bg-white/50 relative group"
+      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-all hover:bg-white/50 relative group cursor-pointer"
       style={{ color: '#5f462d' }}
       title={`Inbox${unreadCount > 0 ? ` - ${unreadCount} unread` : ''}`}
       onClick={() => {
@@ -164,7 +164,7 @@ export function InboxButton({ userId }: InboxButtonProps) {
         console.log('📬 [InboxButton] User navigating to inbox')
       }}
     >
-      <div className="relative">
+      <div className="relative pointer-events-none">
         <Mail
           className={`w-5 h-5 transition-transform ${
             justUpdated ? 'scale-125' : 'scale-100'
@@ -181,14 +181,6 @@ export function InboxButton({ userId }: InboxButtonProps) {
             }}
           >
             {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        )}
-
-        {/* Loading indicator */}
-        {loading && (
-          <span className="absolute -top-1 -right-1 w-3 h-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500" />
           </span>
         )}
       </div>

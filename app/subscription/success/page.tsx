@@ -222,8 +222,9 @@ function SuccessContent() {
         </h1>
 
         <p className="text-gray-600 mb-8">
-          Your subscription is now active! You have full access to all premium
-          features including unlimited bookmarks and the complete emoji library.
+          Your subscription is now active! You now have full access to all
+          premium features, including unlimited links and the complete emoji
+          library.
         </p>
 
         <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 mb-6">
@@ -231,7 +232,7 @@ function SuccessContent() {
             ✅ Premium Features Unlocked:
           </p>
           <ul className="text-sm text-green-700 space-y-1">
-            <li>• Unlimited bookmarks</li>
+            <li>• Unlimited links</li>
             <li>• 750+ premium emojis</li>
             <li>• Unlimited private categories</li>
           </ul>

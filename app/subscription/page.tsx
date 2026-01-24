@@ -27,7 +27,10 @@ function SubscriptionContent() {
 
   const canceled = searchParams.get('canceled')
 
+  // ✅ ONLY refresh if user exists - don't redirect if no user
   useEffect(() => {
+    if (!user) return // Just return, don't redirect
+
     const refreshOnMount = async () => {
       console.log('\n🔄 ═══════ SUBSCRIPTION PAGE REFRESH ═══════')
       if (refreshUser) {
@@ -62,7 +65,7 @@ function SubscriptionContent() {
       clearInterval(interval)
       clearTimeout(timeout)
     }
-  }, [refreshUser])
+  }, [user, refreshUser])
 
   useEffect(() => {
     if (canceled === 'true') {
@@ -81,14 +84,22 @@ function SubscriptionContent() {
         tier: dbUser.subscription_tier || 'free',
         status: dbUser.subscription_status || 'inactive',
       })
+    } else if (!authLoading && !user) {
+      // Set free tier for non-logged-in users
+      setUserSubscription({
+        tier: 'free',
+        status: 'inactive',
+      })
     }
-  }, [dbUser])
+  }, [dbUser, authLoading, user])
 
   const handleSubscribe = async (planType: 'monthly' | 'yearly') => {
+    // ✅ Redirect to login if not authenticated
     if (!user) {
       router.push('/auth/login?redirect=/subscription')
       return
     }
+
     setLoading(planType)
     setError(null)
     try {
@@ -136,7 +147,8 @@ function SubscriptionContent() {
     userSubscription?.tier === 'premium' &&
     userSubscription?.status === 'active'
 
-  if (authLoading || !userSubscription) {
+  // ✅ Only show loading while auth is initially loading
+  if (authLoading) {
     return (
       <div
         className="min-h-screen pt-20 flex items-center justify-center"
@@ -152,7 +164,25 @@ function SubscriptionContent() {
     )
   }
 
-  if (isPremium) {
+  // ✅ Show loading only if user exists but subscription hasn't loaded yet
+  if (user && !userSubscription) {
+    return (
+      <div
+        className="min-h-screen pt-20 flex items-center justify-center"
+        style={{
+          background: 'linear-gradient(135deg, #f5f5dc 0%, #f0f0e6 100%)',
+        }}
+      >
+        <Loader2
+          className="w-8 h-8 animate-spin"
+          style={{ color: '#5f462d' }}
+        />
+      </div>
+    )
+  }
+
+  // PREMIUM USER VIEW - Only show if logged in AND premium
+  if (user && isPremium) {
     return (
       <div
         className="min-h-screen pt-20"
@@ -206,14 +236,14 @@ function SubscriptionContent() {
                   Premium Active
                 </h2>
                 <p className="text-green-700 mb-6 text-lg">
-                  You have unlimited access to all premium features including
-                  unlimited bookmarks, 750+ premium emojis, and unlimited
-                  private categories.
+                  You have unlimited access to all premium features, including
+                  unlimited links, 750+ premium emojis, and unlimited private
+                  categories.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   <div className="flex items-center gap-2 text-green-700">
                     <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
-                    <span className="font-medium">Unlimited Bookmarks</span>
+                    <span className="font-medium">Unlimited Links</span>
                   </div>
                   <div className="flex items-center gap-2 text-green-700">
                     <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
@@ -267,17 +297,6 @@ function SubscriptionContent() {
                   <span className="text-blue-600 text-sm">✓</span>
                 </div>
                 <div>
-                  <p className="font-semibold">View Billing History</p>
-                  <p className="text-sm text-gray-600">
-                    Access all past invoices and receipts
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <span className="text-blue-600 text-sm">✓</span>
-                </div>
-                <div>
                   <p className="font-semibold">Change Plan</p>
                   <p className="text-sm text-gray-600">
                     Switch between monthly and yearly
@@ -291,7 +310,7 @@ function SubscriptionContent() {
                 <div>
                   <p className="font-semibold">Cancel Anytime</p>
                   <p className="text-sm text-gray-600">
-                    No commitments, cancel when you want
+                    No commitments, cancel whenever you like
                   </p>
                 </div>
               </div>
@@ -302,6 +321,7 @@ function SubscriptionContent() {
     )
   }
 
+  // FREE USER / NOT LOGGED IN - Show pricing plans
   return (
     <div
       className="min-h-screen pt-20"
@@ -324,8 +344,8 @@ function SubscriptionContent() {
             Choose Your Plan
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Upgrade to Premium and unlock unlimited bookmarks, exclusive emojis,
-            and more!
+            Upgrade to Premium and unlock unlimited links, exclusive emojis, and
+            more!
           </p>
         </div>
 
@@ -363,16 +383,21 @@ function SubscriptionContent() {
               >
                 £0
               </div>
-              <p className="text-gray-600">Forever free</p>
+              <p className="text-gray-600 mb-2">Forever free</p>
+              <p className="text-sm text-gray-500">
+                Try it instantly with no account required.
+              </p>
             </div>
             <ul className="space-y-3 mb-8">
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                <span className="text-gray-700">Up to 50 bookmarks</span>
+                <span className="text-gray-700">Up to 50 links</span>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                <span className="text-gray-700">Basic emoji set</span>
+                <span className="text-gray-700">
+                  Basic emoji set for categories
+                </span>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
@@ -387,7 +412,7 @@ function SubscriptionContent() {
               disabled
               className="w-full py-3 px-6 rounded-lg font-semibold bg-gray-200 text-gray-500 cursor-not-allowed"
             >
-              Current Plan
+              {user ? 'Current Plan' : 'Always Free'}
             </button>
           </div>
 
@@ -412,13 +437,16 @@ function SubscriptionContent() {
                 </span>
                 <span className="text-gray-600">/month</span>
               </div>
-              <p className="text-gray-600">Billed monthly</p>
+              <p className="text-gray-600 mb-2">Billed monthly</p>
+              <p className="text-sm text-gray-600">
+                Everything you need to organise and share links without limits.
+              </p>
             </div>
             <ul className="space-y-3 mb-8">
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
                 <span className="text-gray-700 font-medium">
-                  Unlimited bookmarks
+                  Unlimited links
                 </span>
               </li>
               <li className="flex items-start gap-3">
@@ -466,7 +494,7 @@ function SubscriptionContent() {
         <div className="max-w-4xl mx-auto mb-12">
           <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl shadow-xl p-8 border-2 border-purple-300 relative overflow-hidden">
             <div className="absolute top-4 right-4 bg-purple-500 text-white px-3 py-1 rounded-full text-xs font-bold">
-              BEST VALUE - SAVE 18%
+              BEST VALUE — SAVE 18%
             </div>
             <div className="grid md:grid-cols-2 gap-8 items-center">
               <div>
@@ -496,7 +524,7 @@ function SubscriptionContent() {
                   <li className="flex items-start gap-3">
                     <Check className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
                     <span className="text-gray-700 font-medium">
-                      Everything in Monthly
+                      Everything in Premium Monthly
                     </span>
                   </li>
                   <li className="flex items-start gap-3">
