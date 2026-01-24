@@ -11,9 +11,17 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [canSubmit, setCanSubmit] = useState(true)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Prevent duplicate submissions
+    if (!canSubmit) {
+      setError('Please wait 5 seconds before trying again')
+      return
+    }
+
     setError('')
     setMessage('')
 
@@ -30,12 +38,14 @@ export default function ForgotPasswordPage() {
     }
 
     setLoading(true)
+    setCanSubmit(false)
+
     try {
       console.log('📧 Sending password reset email to:', email)
       await resetPassword(email)
       console.log('✅ Reset email sent successfully')
       setMessage(
-        'Password reset link sent! Please check your email (including spam folder).'
+        'Password reset link sent! Please check your email (including spam folder).',
       )
       setEmail('')
     } catch (error: any) {
@@ -43,6 +53,10 @@ export default function ForgotPasswordPage() {
       setError(error.message || 'Failed to send reset email')
     } finally {
       setLoading(false)
+      // Re-enable submissions after 5 seconds
+      setTimeout(() => {
+        setCanSubmit(true)
+      }, 5000)
     }
   }
 
@@ -110,18 +124,24 @@ export default function ForgotPasswordPage() {
                 className="w-full pl-10 pr-3 py-2 border-2 border-gray-200 rounded focus:border-transparent focus:outline-none focus:ring-2"
                 placeholder="you@example.com"
                 style={{ '--tw-ring-color': '#5f462d' } as any}
-                disabled={loading}
+                disabled={loading || !canSubmit}
               />
             </div>
           </div>
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !canSubmit}
             className="w-full py-2 px-4 rounded font-semibold text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
-            style={{ background: loading ? '#8b6f47' : '#5f462d' }}
+            style={{
+              background: loading || !canSubmit ? '#8b6f47' : '#5f462d',
+            }}
           >
-            {loading ? 'Sending...' : 'Send Reset Link'}
+            {loading
+              ? 'Sending...'
+              : !canSubmit
+                ? 'Wait 5 seconds...'
+                : 'Send Reset Link'}
           </button>
         </form>
 

@@ -18,43 +18,86 @@ function getBaseUrl(): string {
   return envUrl || 'http://localhost:3000'
 }
 
-export async function signUp(
-  email: string,
-  password: string,
-  metadata: { full_name?: string } = {}
-) {
-  const supabase = createClient()
+// ============================================================================
+// REQUEST THROTTLING - Prevents duplicate rapid-fire requests
+// ============================================================================
 
-  // Build clean redirect URL with no spaces
-  const baseUrl = getBaseUrl()
-  const redirectUrl = `${baseUrl}/auth/callback`
+const requestLocks = new Map<string, boolean>()
 
-  console.log('📧 Sign up redirect URL:', redirectUrl)
+function createThrottledFunction<T extends (...args: any[]) => Promise<any>>(
+  fn: T,
+  key: string,
+  cooldownMs: number = 3000,
+): T {
+  return (async (...args: any[]) => {
+    const lockKey = `${key}-${JSON.stringify(args)}`
 
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: metadata,
-      emailRedirectTo: redirectUrl,
-    },
-  })
+    if (requestLocks.get(lockKey)) {
+      throw new Error('Request already in progress. Please wait.')
+    }
 
-  if (error) throw error
-  return data
+    requestLocks.set(lockKey, true)
+
+    try {
+      const result = await fn(...args)
+      return result
+    } finally {
+      setTimeout(() => {
+        requestLocks.delete(lockKey)
+      }, cooldownMs)
+    }
+  }) as T
 }
 
-export async function signIn(email: string, password: string) {
-  const supabase = createClient()
+// ============================================================================
+// AUTH FUNCTIONS
+// ============================================================================
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  })
+export const signUp = createThrottledFunction(
+  async (
+    email: string,
+    password: string,
+    metadata: { full_name?: string } = {},
+  ) => {
+    const supabase = createClient()
 
-  if (error) throw error
-  return data
-}
+    // Build clean redirect URL with no spaces
+    const baseUrl = getBaseUrl()
+    const redirectUrl = `${baseUrl}/auth/callback`
+
+    console.log('📧 Sign up redirect URL:', redirectUrl)
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: metadata,
+        emailRedirectTo: redirectUrl,
+      },
+    })
+
+    if (error) throw error
+    return data
+  },
+  'signUp',
+  5000, // 5 second cooldown
+)
+
+export const signIn = createThrottledFunction(
+  async (email: string, password: string) => {
+    const supabase = createClient()
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (error) throw error
+    return data
+  },
+  'signIn',
+  3000, // 3 second cooldown
+)
 
 export async function signInWithGoogle() {
   const supabase = createClient()
@@ -128,63 +171,50 @@ export async function getCurrentUserServer() {
   }
 }
 
-export async function resetPassword(email: string) {
-  const supabase = createClient()
+export const resetPassword = createThrottledFunction(
+  async (email: string) => {
+    const supabase = createClient()
 
-  const baseUrl = getBaseUrl()
-  const redirectUrl = `${baseUrl}/auth/reset-password`
+    const baseUrl = getBaseUrl()
+    const redirectUrl = `${baseUrl}/auth/reset-password`
 
-  // ENHANCED DEBUGGING
-  console.log('🔍 ========== PASSWORD RESET DEBUG ==========')
-  console.log('📧 Email:', email)
-  console.log('🌐 Base URL:', baseUrl)
-  console.log('🔗 Redirect URL:', redirectUrl)
-  console.log('📏 Redirect URL length:', redirectUrl.length)
-  console.log('✂️  Redirect URL trimmed:', redirectUrl.trim())
-  console.log('❓ Has spaces:', redirectUrl !== redirectUrl.trim())
-  console.log(
-    '📊 Char codes:',
-    Array.from(redirectUrl).map((c, i) => `${i}: '${c}' (${c.charCodeAt(0)})`)
-  )
-  console.log(
-    '🌍 Window origin:',
-    typeof window !== 'undefined' ? window.location.origin : 'N/A'
-  )
-  console.log(
-    '📦 ENV variable:',
-    process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL
-  )
-  console.log('==========================================')
+    console.log('🔍 Password reset for:', email)
+    console.log('🔗 Redirect URL:', redirectUrl)
 
-  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: redirectUrl,
-  })
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectUrl,
+    })
 
-  console.log('📤 Supabase response:', { data, error })
+    if (error) {
+      console.error('❌ Reset password error:', error)
+      throw error
+    }
 
-  if (error) {
-    console.error('❌ Reset password error:', error)
-    throw error
-  }
+    console.log('✅ Reset password email sent')
+    return data
+  },
+  'resetPassword',
+  5000, // 5 second cooldown
+)
 
-  console.log('✅ Reset password email sent')
-  return data
-}
+export const updatePassword = createThrottledFunction(
+  async (newPassword: string) => {
+    const supabase = createClient()
 
-export async function updatePassword(newPassword: string) {
-  const supabase = createClient()
+    console.log('🔐 Updating password...')
 
-  console.log('🔐 Updating password...')
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+    })
 
-  const { data, error } = await supabase.auth.updateUser({
-    password: newPassword,
-  })
+    if (error) {
+      console.error('❌ Update password error:', error)
+      throw error
+    }
 
-  if (error) {
-    console.error('❌ Update password error:', error)
-    throw error
-  }
-
-  console.log('✅ Password updated successfully')
-  return data
-}
+    console.log('✅ Password updated successfully')
+    return data
+  },
+  'updatePassword',
+  3000, // 3 second cooldown
+)

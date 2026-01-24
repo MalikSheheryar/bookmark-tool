@@ -18,7 +18,7 @@ export function createClient() {
         persistSession: true,
         autoRefreshToken: true,
       },
-    }
+    },
   )
 
   return browserClient
