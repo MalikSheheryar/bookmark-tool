@@ -29,7 +29,7 @@ interface CategorySectionProps {
   onDeleteBookmark: (
     categoryName: string,
     index: number,
-    bookmarkName: string
+    bookmarkName: string,
   ) => void
   onShareCategory: (categoryName: string) => void
   onCreateCategory: () => void
@@ -53,7 +53,7 @@ interface SortableCategoryItemProps {
   onDeleteBookmark: (
     categoryName: string,
     index: number,
-    bookmarkName: string
+    bookmarkName: string,
   ) => void
   onShareCategory: (categoryName: string) => void
   onSetEditingName: (name: string) => void
@@ -265,17 +265,6 @@ function SortableCategoryItem({
 
         <div className="category-actions">
           <button
-            className="action-btn share-btn"
-            onClick={(e) => {
-              e.stopPropagation()
-              onShareCategory(categoryName)
-            }}
-            title="Share Category"
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            <i className="fa-solid fa-share"></i>
-          </button>
-          <button
             className="action-btn"
             onClick={(e) => {
               e.stopPropagation()
@@ -328,7 +317,7 @@ function SortableCategoryItem({
                       onDeleteBookmark(
                         categoryName,
                         bookmarkIndex,
-                        bookmark.siteName
+                        bookmark.siteName,
                       )
                     }
                     title="Delete Bookmark"
@@ -359,7 +348,7 @@ export function CategorySection({
   onToggleVisibility,
 }: CategorySectionProps) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set()
+    new Set(),
   )
   const [editingName, setEditingName] = useState('')
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -372,7 +361,7 @@ export function CategorySection({
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   )
 
   const toggleCategory = (categoryName: string) => {
