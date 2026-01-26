@@ -19,7 +19,7 @@ export function ErrorModal({ show, onClose }: ErrorModalProps) {
         <div className="modal-header">
           <h3 className="modal-title">
             <span className="me-2">😊</span>
-            Oops—almost there!
+            Oops — almost there!
           </h3>
 
           <button className="modal-close" onClick={onClose}>
@@ -32,18 +32,18 @@ export function ErrorModal({ show, onClose }: ErrorModalProps) {
           </p>
           <ul>
             <li>
-              <strong>Bookmark Name:</strong>
+              <strong>Link name:</strong>
               <ul>
-                <li>Must be at least 3 characters long</li>
-                <li>Only letters, numbers, and spaces allowed</li>
-                <li>Cannot start or end with spaces</li>
+                <li>Must be at least 2 characters long</li>
+                <li>Only letters, numbers and spaces are allowed</li>
+                <li>Cannot start or end with a space</li>
               </ul>
             </li>
             <li>
               <strong>Website URL:</strong>
               <ul>
                 <li>Must be a valid URL format</li>
-                <li>Will automatically add https:// if missing</li>
+                <li>https:// will be added automatically if missing</li>
               </ul>
             </li>
             <li>

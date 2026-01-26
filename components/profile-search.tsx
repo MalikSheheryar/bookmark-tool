@@ -40,10 +40,12 @@ export function ProfileSearch() {
         try {
           const profiles = await searchPublicProfiles(query.trim())
           setResults(profiles)
-          setIsOpen(true)
+          // Only open dropdown if there are results OR still loading
+          setIsOpen(profiles.length > 0 || loading)
         } catch (error) {
           console.error('Search error:', error)
           setResults([])
+          setIsOpen(false)
         } finally {
           setLoading(false)
         }
@@ -68,6 +70,9 @@ export function ProfileSearch() {
     if (parts.length === 1) return parts[0][0].toUpperCase()
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
   }
+
+  // Only show dropdown if loading OR there are results
+  const shouldShowDropdown = isOpen && (loading || results.length > 0)
 
   return (
     <div ref={searchRef} className="relative" style={{ minWidth: '280px' }}>
@@ -205,8 +210,7 @@ export function ProfileSearch() {
           margin-top: 2px;
         }
 
-        .loading-state,
-        .no-results {
+        .loading-state {
           padding: 24px;
           text-align: center;
           color: #64748b;
@@ -244,7 +248,11 @@ export function ProfileSearch() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search profiles..."
             className="w-full pl-10 pr-3 py-2 search-input"
-            onFocus={() => query.trim().length >= 2 && setIsOpen(true)}
+            onFocus={() => {
+              if (query.trim().length >= 2 && results.length > 0) {
+                setIsOpen(true)
+              }
+            }}
           />
           {query && (
             <button
@@ -260,14 +268,14 @@ export function ProfileSearch() {
           )}
         </div>
 
-        {isOpen && (
+        {shouldShowDropdown && (
           <div className="search-dropdown">
             {loading ? (
               <div className="loading-state">
                 <div className="loading-spinner" />
                 <p>Searching...</p>
               </div>
-            ) : results.length > 0 ? (
+            ) : (
               results.map((profile) => (
                 <div
                   key={profile.id}
@@ -302,10 +310,6 @@ export function ProfileSearch() {
                   <User className="w-4 h-4" style={{ color: '#975226' }} />
                 </div>
               ))
-            ) : (
-              <div className="no-results">
-                <p>No profiles found for "{query}"</p>
-              </div>
             )}
           </div>
         )}

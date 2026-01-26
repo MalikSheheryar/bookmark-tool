@@ -309,7 +309,7 @@ export function useBookmarkManagerHybrid(
   const validateBookmarkName = (name: string): boolean => {
     const trimmed = name.trim()
     return (
-      trimmed.length >= 3 &&
+      trimmed.length >= 2 &&
       /^[a-zA-Z0-9\s]+$/.test(trimmed) &&
       !trimmed.startsWith(' ') &&
       !trimmed.endsWith(' ')

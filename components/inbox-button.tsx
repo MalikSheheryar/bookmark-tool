@@ -35,7 +35,7 @@ export function InboxButton({ userId }: InboxButtonProps) {
       console.error('❌ [InboxButton] Error fetching unread count:', error)
       return unreadCount // Return current count on error
     }
-  }, [userId])
+  }, [userId, unreadCount])
 
   // Initial fetch - runs immediately
   useEffect(() => {
@@ -155,16 +155,14 @@ export function InboxButton({ userId }: InboxButtonProps) {
   return (
     <Link
       href="/inbox"
-      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-all hover:bg-white/50 relative group cursor-pointer"
-      style={{ color: '#5f462d' }}
+      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-all hover:bg-white/50 relative group"
+      style={{ color: '#5f462d', cursor: 'pointer', zIndex: 10 }}
       title={`Inbox${unreadCount > 0 ? ` - ${unreadCount} unread` : ''}`}
       onClick={() => {
-        // Optimistically reset count when user clicks to inbox
-        // (will be corrected by actual fetch in inbox page)
         console.log('📬 [InboxButton] User navigating to inbox')
       }}
     >
-      <div className="relative pointer-events-none">
+      <div className="relative">
         <Mail
           className={`w-5 h-5 transition-transform ${
             justUpdated ? 'scale-125' : 'scale-100'
@@ -178,6 +176,7 @@ export function InboxButton({ userId }: InboxButtonProps) {
             }`}
             style={{
               animation: justUpdated ? 'pulse 0.5s ease-in-out' : 'none',
+              pointerEvents: 'none', // Badge shouldn't block clicks
             }}
           >
             {unreadCount > 99 ? '99+' : unreadCount}

@@ -87,7 +87,8 @@ export default function DashboardPage() {
         background: 'linear-gradient(135deg, #f5f5dc 0%, #f0f0e6 100%)',
       }}
     >
-      <div className="pt-5">
+      {/* Added proper padding to account for fixed navbar */}
+      <div className="pt-20">
         <BookmarkManager userId={user.id} />
       </div>
     </div>

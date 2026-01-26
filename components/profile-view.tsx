@@ -73,7 +73,7 @@ export default function ProfileView({
   const [profilePicture, setProfilePicture] = useState<string | null>(null)
   const [shareUrlCopied, setShareUrlCopied] = useState(false)
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(
-    null
+    null,
   )
   const [checkingUsername, setCheckingUsername] = useState(false)
 
@@ -88,7 +88,7 @@ export default function ProfileView({
       try {
         const available = await checkUsernameAvailable(
           formData.username,
-          userId
+          userId,
         )
         setUsernameAvailable(available)
       } catch (error) {
@@ -169,7 +169,7 @@ export default function ProfileView({
   }
 
   const handleProfilePictureChange = async (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -207,7 +207,7 @@ export default function ProfileView({
       setError(
         error instanceof Error
           ? error.message
-          : 'Failed to upload profile picture'
+          : 'Failed to upload profile picture',
       )
       setTimeout(() => setError(null), 5000)
     } finally {
@@ -237,7 +237,7 @@ export default function ProfileView({
       setError(
         error instanceof Error
           ? error.message
-          : 'Failed to remove profile picture'
+          : 'Failed to remove profile picture',
       )
       setTimeout(() => setError(null), 5000)
     } finally {
@@ -267,7 +267,7 @@ export default function ProfileView({
 
         if (!/^[a-z0-9_]+$/.test(formData.username)) {
           setError(
-            'Username can only contain lowercase letters, numbers, and underscores'
+            'Username can only contain lowercase letters, numbers, and underscores',
           )
           setIsSaving(false)
           return
@@ -275,7 +275,7 @@ export default function ProfileView({
 
         const available = await checkUsernameAvailable(
           formData.username,
-          userId
+          userId,
         )
         if (!available) {
           setError('Username is already taken')
@@ -304,7 +304,7 @@ export default function ProfileView({
     } catch (error) {
       console.error('Error updating profile:', error)
       setError(
-        error instanceof Error ? error.message : 'Failed to update profile'
+        error instanceof Error ? error.message : 'Failed to update profile',
       )
       setTimeout(() => setError(null), 5000)
     } finally {
@@ -501,7 +501,8 @@ export default function ProfileView({
                 )}
 
                 {userProfile.bio && !isEditing && (
-                  <p className="text-gray-600 mt-2 text-sm leading-relaxed max-w-md">
+                  <p className="text-gray-600 mt-2 text-sm leading-relaxed max-w-md break-words whitespace-pre-wrap">
+                    {' '}
                     {userProfile.bio}
                   </p>
                 )}
@@ -637,10 +638,10 @@ export default function ProfileView({
                         checkingUsername
                           ? 'border-gray-300'
                           : usernameAvailable === true
-                          ? 'border-green-500 focus:ring-green-500'
-                          : usernameAvailable === false
-                          ? 'border-red-500 focus:ring-red-500'
-                          : 'border-gray-300 focus:ring-blue-500'
+                            ? 'border-green-500 focus:ring-green-500'
+                            : usernameAvailable === false
+                              ? 'border-red-500 focus:ring-red-500'
+                              : 'border-gray-300 focus:ring-blue-500'
                       }`}
                       placeholder="your_username"
                       pattern="[a-z0-9_]+"
@@ -662,8 +663,8 @@ export default function ProfileView({
                       {usernameAvailable === false
                         ? '❌ Username already taken'
                         : usernameAvailable === true
-                        ? '✅ Username available'
-                        : 'Only lowercase letters, numbers, and underscores'}
+                          ? '✅ Username available'
+                          : 'Only lowercase letters, numbers, and underscores'}
                     </p>
                     <button
                       type="button"
@@ -693,11 +694,11 @@ export default function ProfileView({
                     }
                     rows={4}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:outline-none focus:ring-blue-500"
-                    placeholder="Tell us about yourself... (max 500 characters)"
-                    maxLength={500}
+                    placeholder="Tell us about yourself... (max 250 characters)"
+                    maxLength={250}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    {formData.bio.length}/500 characters
+                    {formData.bio.length}/250 characters
                   </p>
                 </div>
 
@@ -753,7 +754,7 @@ export default function ProfileView({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Website / Portfolio Link
+                    Website or Portfolio Link
                   </label>
                   <div className="relative">
                     <ExternalLink className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
@@ -801,7 +802,7 @@ export default function ProfileView({
       {/* Quick Links */}
       <div className="bg-white rounded-lg shadow-lg p-8 border border-gray-200">
         <h2 className="text-2xl font-bold mb-6" style={{ color: '#5f462d' }}>
-          Quick Links
+          My Links
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Link
@@ -812,10 +813,10 @@ export default function ProfileView({
               className="font-semibold text-lg mb-1"
               style={{ color: '#5f462d' }}
             >
-              📚 My Bookmarks
+              📚 My Links
             </h3>
             <p className="text-sm text-gray-600">
-              View and manage your bookmarks
+              View, add and organize your links.
             </p>
           </Link>
         </div>

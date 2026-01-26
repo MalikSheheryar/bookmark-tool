@@ -41,7 +41,6 @@ const TwemojiEmoji: React.FC<{
   }
 
   if (imgError) {
-    // Fallback to native emoji if Twemoji fails to load
     return (
       <span className={className} style={{ fontSize: `${size}px` }}>
         {emoji}
@@ -76,7 +75,6 @@ const renderEmoji = (emoji: string) => {
     )
   }
 
-  // Use Twemoji for Unicode emojis
   return <TwemojiEmoji emoji={emoji} className="twemoji-emoji" size={16} />
 }
 
@@ -98,21 +96,55 @@ export function BookmarkForm({
   })
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string>('')
+
+  // Function to normalize URL by adding https:// if missing
+  const normalizeURL = (url: string): string => {
+    const trimmed = url.trim()
+    if (!trimmed) return ''
+
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed
+    }
+
+    return `https://${trimmed}`
+  }
 
   const validateBookmarkName = (name: string): boolean => {
+    // Check if starts or ends with space FIRST (before trimming)
+    if (name.startsWith(' ') || name.endsWith(' ')) return false
+
     const trimmed = name.trim()
-    return (
-      trimmed.length >= 3 &&
-      /^[a-zA-Z0-9\s]+$/.test(trimmed) &&
-      !trimmed.startsWith(' ') &&
-      !trimmed.endsWith(' ')
-    )
+
+    // Must be at least 2 characters
+    if (trimmed.length < 2) return false
+
+    // Only letters, numbers, and spaces allowed
+    if (!/^[a-zA-Z0-9\s]+$/.test(trimmed)) return false
+
+    return true
   }
 
   const validateURL = (url: string): boolean => {
     try {
-      const normalizedURL = url.startsWith('http') ? url : `https://${url}`
-      new URL(normalizedURL)
+      const trimmed = url.trim()
+      if (!trimmed) return false
+
+      // Check for invalid characters that shouldn't be in URLs
+      const invalidChars = /[,<>{}|\\^`\[\]]/
+      if (invalidChars.test(trimmed)) return false
+
+      const normalizedURL = normalizeURL(trimmed)
+      if (!normalizedURL) return false
+
+      const urlObj = new URL(normalizedURL)
+
+      // Additional validation: must have a valid hostname
+      if (!urlObj.hostname || urlObj.hostname.length < 3) return false
+
+      // Must have at least one dot in hostname (e.g., google.com, not just "google")
+      if (!urlObj.hostname.includes('.')) return false
+
       return true
     } catch {
       return false
@@ -121,8 +153,8 @@ export function BookmarkForm({
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+    setErrorMessage('') // Clear error message on input change
 
-    // Real-time validation
     let validationClass = ''
     if (field === 'name' && value) {
       validationClass = validateBookmarkName(value) ? 'valid' : 'invalid'
@@ -137,10 +169,81 @@ export function BookmarkForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    setErrorMessage('')
 
-    if (onSubmit(formData)) {
+    // Validate all fields before submitting
+    const errors: string[] = []
+
+    // Validate name
+    if (!formData.name.trim()) {
+      errors.push('❌ Link name is required')
+    } else if (!validateBookmarkName(formData.name)) {
+      const trimmed = formData.name.trim()
+      if (formData.name.startsWith(' ') || formData.name.endsWith(' ')) {
+        errors.push('❌ Link name cannot start or end with a space')
+      } else if (trimmed.length < 2) {
+        errors.push('❌ Link name must be at least 2 characters long')
+      } else if (!/^[a-zA-Z0-9\s]+$/.test(trimmed)) {
+        errors.push('❌ Link name can only contain letters, numbers and spaces')
+      }
+    }
+
+    // Validate URL
+    if (!formData.url.trim()) {
+      errors.push('❌ Website URL is required')
+    } else if (!validateURL(formData.url)) {
+      errors.push(
+        '❌ Website URL is not valid (e.g., google.com or https://google.com)',
+      )
+    }
+
+    // Validate category
+    if (!formData.category) {
+      errors.push('❌ Please select a category')
+    }
+
+    // If there are validation errors, show them
+    if (errors.length > 0) {
+      setErrorMessage(errors.join('\n'))
+      // Update validation states to show errors
+      setValidation({
+        name: formData.name
+          ? validateBookmarkName(formData.name)
+            ? 'valid'
+            : 'invalid'
+          : 'invalid',
+        url: formData.url
+          ? validateURL(formData.url)
+            ? 'valid'
+            : 'invalid'
+          : 'invalid',
+        category: formData.category ? 'valid' : 'invalid',
+      })
+      return
+    }
+
+    // Normalize the URL before submitting
+    const normalizedData = {
+      ...formData,
+      name: formData.name.trim(),
+      url: normalizeURL(formData.url),
+      category: formData.category,
+    }
+
+    console.log('Submitting bookmark:', normalizedData)
+
+    // Try to submit
+    const success = onSubmit(normalizedData)
+
+    if (success) {
+      // Reset form on success
       setFormData({ name: '', url: '', category: '' })
       setValidation({ name: '', url: '', category: '' })
+      setErrorMessage('')
+    } else {
+      setErrorMessage(
+        '❌ Failed to create bookmark. This link might already exist in this category.',
+      )
     }
   }
 
@@ -150,7 +253,6 @@ export function BookmarkForm({
   }
 
   useEffect(() => {
-    // Auto-focus on name input
     const nameInput = document.getElementById('bookmarkName')
     if (nameInput) {
       setTimeout(() => nameInput.focus(), 500)
@@ -159,7 +261,6 @@ export function BookmarkForm({
 
   return (
     <>
-      {/* Add custom styles for Twemoji in bookmark form */}
       <style jsx>{`
         .twemoji-emoji {
           display: inline-block !important;
@@ -223,7 +324,6 @@ export function BookmarkForm({
           text-align: center;
         }
 
-        /* Custom emoji image fallback */
         .custom-emoji-image {
           width: 16px;
           height: 16px;
@@ -232,7 +332,18 @@ export function BookmarkForm({
           margin-right: 6px;
         }
 
-        /* Responsive adjustments */
+        .error-message {
+          background: #fee;
+          border: 1px solid #fcc;
+          border-radius: 8px;
+          padding: 12px 16px;
+          margin-bottom: 16px;
+          color: #c33;
+          font-size: 14px;
+          white-space: pre-line;
+          line-height: 1.6;
+        }
+
         @media (max-width: 640px) {
           .category-emoji .twemoji-emoji {
             width: 14px !important;
@@ -248,6 +359,8 @@ export function BookmarkForm({
 
       <section className="bookmark-inputs">
         <form onSubmit={handleSubmit}>
+          {errorMessage && <div className="error-message">{errorMessage}</div>}
+
           <div className="row input-row">
             <div className="col-lg-4 col-md-6">
               <div className="modern-input-group">
@@ -256,11 +369,11 @@ export function BookmarkForm({
                 </div>
                 <input
                   type="text"
-                  autoFocus={false} // Add this
+                  autoFocus={false}
                   id="bookmarkName"
                   className={`modern-input ${validation.name}`}
-                  placeholder="Bookmark Name"
-                  aria-label="Bookmark Name"
+                  placeholder="Link Name"
+                  aria-label="Link Name"
                   autoComplete="off"
                   value={formData.name}
                   onChange={(e) => handleInputChange('name', e.target.value)}
@@ -283,10 +396,10 @@ export function BookmarkForm({
                   <Link className="w-5 h-5 text-green-500" />
                 </div>
                 <input
-                  type="url"
+                  type="text"
                   id="websiteURL"
                   className={`modern-input ${validation.url}`}
-                  placeholder="Website URL"
+                  placeholder="Website URL (e.g., google.com)"
                   aria-label="Website URL"
                   autoComplete="off"
                   value={formData.url}
@@ -324,7 +437,7 @@ export function BookmarkForm({
                           {bookmarkData.categoryEmojis[formData.category] && (
                             <span className="category-emoji">
                               {renderEmoji(
-                                bookmarkData.categoryEmojis[formData.category]
+                                bookmarkData.categoryEmojis[formData.category],
                               )}
                             </span>
                           )}
@@ -343,6 +456,11 @@ export function BookmarkForm({
                   {validation.category === 'valid' && (
                     <div className="validation-icon valid">
                       <i className="fa-solid fa-check"></i>
+                    </div>
+                  )}
+                  {validation.category === 'invalid' && (
+                    <div className="validation-icon invalid">
+                      <i className="fa-solid fa-times"></i>
                     </div>
                   )}
                 </div>
@@ -365,7 +483,7 @@ export function BookmarkForm({
                           {bookmarkData.categoryEmojis[category] && (
                             <span className="category-emoji">
                               {renderEmoji(
-                                bookmarkData.categoryEmojis[category]
+                                bookmarkData.categoryEmojis[category],
                               )}
                             </span>
                           )}

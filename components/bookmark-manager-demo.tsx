@@ -9,7 +9,6 @@ import { CategoryModal } from '@/components/category-modal-demo'
 import { ShareModal } from '@/components/share-modal'
 import { DeleteModal } from '@/components/delete-modal'
 import { Toast } from '@/components/toast'
-import { DragGuide } from '@/components/drag-guide'
 import { useBookmarkManagerHybrid } from '@/hooks/use-bookmark-manager-hybrid'
 import '@/styles/bookmark-manager.css'
 
@@ -300,7 +299,6 @@ export default function BookmarkManager() {
         </div>
       </header>
 
-      <DragGuide show={dragState.dragging} />
 
       <main className="main-wrapper">
         <div className="main-container">
