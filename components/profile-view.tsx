@@ -851,7 +851,7 @@ export default function ProfileView({
               📚 My Links
             </h3>
             <p className="text-sm text-gray-600">
-              View, add and organize your links.
+              View, add and organise your links.
             </p>
           </Link>
         </div>
