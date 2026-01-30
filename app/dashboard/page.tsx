@@ -65,7 +65,7 @@ export default function DashboardPage() {
             style={{ borderColor: '#5f462d' }}
           />
           <p style={{ color: '#5f462d' }} className="text-lg">
-            Loading your bookmarks...
+            Loading your Links...
           </p>
         </div>
       </div>

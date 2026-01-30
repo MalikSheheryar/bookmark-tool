@@ -160,7 +160,7 @@ export function useBookmarkManager() {
         },
       }))
 
-      showToast('Bookmark added successfully!')
+      showToast('Link added successfully!')
       return true
     },
     [showModal, showToast]

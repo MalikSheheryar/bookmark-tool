@@ -397,7 +397,7 @@ export function useBookmarkManagerHybrid(
           console.log('✅ Synced to database')
         }
 
-        showToast('Bookmark updated successfully! ✅', 'success')
+        showToast('Link updated successfully! ✅', 'success')
         return true
       } catch (error) {
         console.error('❌ Error updating bookmark:', error)
@@ -491,7 +491,7 @@ export function useBookmarkManagerHybrid(
         return updatedData
       })
 
-      showToast('Bookmark added successfully!')
+      showToast('Link added successfully!')
       return true
     },
     [bookmarkData.categories, canCreateBookmark, options, showModal, showToast],

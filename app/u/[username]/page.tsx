@@ -190,9 +190,7 @@ export default function PublicProfilePage() {
       try {
         await navigator.share({
           title: `${profile?.full_name || profile?.username}'s Profile`,
-          text: `Check out ${
-            profile?.full_name || profile?.username
-          }'s bookmarks`,
+          text: `Check out ${profile?.full_name || profile?.username}'s links`,
           url: url,
         })
       } catch (err) {
