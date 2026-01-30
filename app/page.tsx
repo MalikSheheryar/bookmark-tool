@@ -71,7 +71,7 @@ export default function Home() {
 
           <p className="text-lg md:text-xl text-gray-600 mb-8">
             Keep track of your favorite websites with a modern, organized link
-            manager. Sign in to save your Links to the cloud.
+            manager. Sign in to save your links.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
@@ -128,12 +128,12 @@ export default function Home() {
             <FeatureCard
               icon="⚡"
               title="Lightning Fast"
-              description="Instant access to all links"
+              description="Instant access to all your links"
             />
             <FeatureCard
               icon="🔄"
               title="Auto Sync"
-              description="Sync your links across all devices"
+              description="Sync your links across all your devices"
             />
             <FeatureCard
               icon="🎯"
