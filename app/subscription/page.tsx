@@ -567,7 +567,7 @@ function SubscriptionContent() {
 
         <div className="mt-16 text-center">
           <p className="text-sm text-gray-500 mb-4">
-            Trusted by bookmark enthusiasts worldwide
+            Trusted by link enthusiasts worldwide
           </p>
           <div className="flex items-center justify-center gap-8 flex-wrap">
             <div className="flex items-center gap-2 text-gray-600">

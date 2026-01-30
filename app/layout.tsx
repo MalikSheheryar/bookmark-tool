@@ -13,7 +13,7 @@ const tektur = Tektur({
 export const metadata = {
   title: 'Link Manager',
   description:
-    'organise your favorite sites with categories and drag-and-drop functionality',
+    'organise your favourite sites with categories and drag-and-drop functionality',
 }
 
 export default function RootLayout({
