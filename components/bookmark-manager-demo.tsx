@@ -323,24 +323,29 @@ export default function BookmarkManager() {
   }
 
   return (
-    <div className="bookmark-manager">
+    <div className="bookmark-manager py-15">
       <header className="bookmark-header">
         <div className="header-container">
           <h1
+            className="
+    flex flex-wrap items-center justify-center gap-2
+    text-center font-semibold
+    leading-tight
+    mt-10 sm:mt-0
+  "
             style={{
-              fontSize: '2.5rem',
-              fontWeight: 600,
-              textAlign: 'center',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
-              margin: 0,
+              fontSize: 'clamp(2rem, 4vw, 3rem)',
             }}
           >
-            <i className="fa-regular fa-bookmark"></i>
-            Create categories to organise your links
-            <i className="fa-regular fa-bookmark"></i>
+            <i
+              className="fa-regular fa-bookmark"
+              style={{ fontSize: '1rem' }}
+            />
+            <span>Create categories to organise your links</span>
+            <i
+              className="fa-regular fa-bookmark"
+              style={{ fontSize: '1rem' }}
+            />
           </h1>
         </div>
       </header>

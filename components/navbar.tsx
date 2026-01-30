@@ -138,7 +138,7 @@ export function Navbar() {
                     {/* Subscription Link for Guests */}
                     <Link
                       href="/subscription"
-                      className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-all hover:bg-white/50"
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-all hover:bg-white/50"
                       style={{ color: '#5f462d' }}
                     >
                       <Sparkles className="w-5 h-5" />

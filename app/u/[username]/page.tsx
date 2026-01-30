@@ -263,7 +263,7 @@ export default function PublicProfilePage() {
 
   return (
     <div
-      className="min-h-screen py-8"
+      className="min-h-screen py-15"
       style={{
         background: 'linear-gradient(135deg, #f5f5dc 0%, #f0f0e6 100%)',
       }}
@@ -324,21 +324,26 @@ export default function PublicProfilePage() {
             </div>
 
             {/* Profile Info */}
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
                 <User className="w-5 h-5 text-gray-500" />
                 <span className="text-sm text-gray-600">
                   @{profile.username}
                 </span>
               </div>
+
               <h1
                 className="text-3xl font-bold mb-3"
                 style={{ color: '#5f462d' }}
               >
                 {profile.full_name || profile.username}
               </h1>
+
               {profile.bio && (
-                <p className="text-gray-600 mb-4 leading-relaxed">
+                <p
+                  className="text-gray-600 mb-4 leading-relaxed"
+                  style={{ overflowWrap: 'anywhere' }}
+                >
                   {profile.bio}
                 </p>
               )}

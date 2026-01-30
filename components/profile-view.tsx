@@ -395,7 +395,7 @@ export default function ProfileView({
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
+    <div className="max-w-5xl mx-auto px-4 py-15">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold" style={{ color: '#5f462d' }}>
@@ -534,7 +534,10 @@ export default function ProfileView({
                 )}
 
                 {userProfile.bio && !isEditing && (
-                  <p className="text-gray-600 mt-2 text-sm leading-relaxed max-w-md break-words whitespace-pre-wrap">
+                  <p
+                    className="text-gray-600 mt-2 text-sm leading-relaxed max-w-md whitespace-pre-wrap"
+                    style={{ overflowWrap: 'anywhere' }}
+                  >
                     {userProfile.bio}
                   </p>
                 )}

@@ -229,7 +229,7 @@ export default function SharedCategoryPage() {
 
   return (
     <div
-      className="min-h-screen py-8"
+      className="min-h-screen py-15"
       style={{
         background: 'linear-gradient(135deg, #f5f5dc 0%, #f0f0e6 100%)',
       }}

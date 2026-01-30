@@ -1,4 +1,4 @@
-// File: components/share-category-modal.tsx (FIXED - Optimized dropdown UI)
+// File: components/share-category-modal.tsx (FIXED - With Twemoji support)
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -18,7 +18,6 @@ interface ShareCategoryModalProps {
   show: boolean
   onClose: () => void
   currentUserId: string
-  // ✅ REMOVED: currentUsername - not needed anymore!
 }
 
 interface UserOption {
@@ -32,6 +31,71 @@ interface Category {
   id: string
   name: string
   emoji: string | null
+}
+
+// Custom emoji mappings for problematic emojis
+const CUSTOM_EMOJI_MAP: Record<string, string> = {
+  '🏴󠁧󠁢󠁥󠁮󠁧󠁿': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3f4-e0067-e0062-e0065-e006e-e0067-e007f.svg',
+  '🏴󠁧󠁢󠁳󠁣󠁴󠁿': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3f4-e0067-e0062-e0073-e0063-e0074-e007f.svg',
+  '🏴󠁧󠁢󠁷󠁬󠁳󠁿': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3f4-e0067-e0062-e0077-e006c-e0073-e007f.svg',
+}
+
+// Utility function to convert emoji to Twemoji image URL
+const getEmojiImageUrl = (emoji: string): string => {
+  if (CUSTOM_EMOJI_MAP[emoji]) {
+    return CUSTOM_EMOJI_MAP[emoji]
+  }
+
+  const codePoint = [...emoji]
+    .map((char) => {
+      const code = char.codePointAt(0)
+      return code ? code.toString(16) : ''
+    })
+    .join('-')
+
+  return `https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/${codePoint}.svg`
+}
+
+// Twemoji component for Share Category Modal
+const TwemojiEmoji: React.FC<{
+  emoji: string
+  className?: string
+  size?: number
+}> = ({ emoji, className = '', size = 24 }) => {
+  const [imgSrc, setImgSrc] = useState<string>('')
+  const [imgError, setImgError] = useState(false)
+
+  useEffect(() => {
+    setImgSrc(getEmojiImageUrl(emoji))
+    setImgError(false)
+  }, [emoji])
+
+  const handleError = () => {
+    setImgError(true)
+  }
+
+  if (imgError) {
+    return (
+      <span className={className} style={{ fontSize: `${size}px` }}>
+        {emoji}
+      </span>
+    )
+  }
+
+  return (
+    <img
+      src={imgSrc}
+      alt={emoji}
+      className={className}
+      style={{
+        width: `${size}px`,
+        height: `${size}px`,
+        display: 'inline-block',
+        verticalAlign: 'middle',
+      }}
+      onError={handleError}
+    />
+  )
 }
 
 export function ShareCategoryModal({
@@ -108,12 +172,10 @@ export function ShareCategoryModal({
     setError(null)
 
     try {
-      // ✅ FIXED: URL will be generated in the service with share token
-      // We pass empty string as placeholder (will be replaced in service)
       await sendCategoryShare(currentUserId, {
         recipientId: selectedUser.id,
         categoryName: selectedCategory.name,
-        categoryUrl: '', // Will be generated in service
+        categoryUrl: '',
         note: note.trim() || undefined,
       })
 
@@ -309,7 +371,7 @@ export function ShareCategoryModal({
                       {userResults.map((user) => (
                         <div
                           key={user.id}
-                          className="group p-3 border border-gray-200 rounded-xl cursor-pointer transition-all duration-200  hover:shadow-md"
+                          className="group p-3 border border-gray-200 rounded-xl cursor-pointer transition-all duration-200 hover:border-[#5f462d] hover:bg-gradient-to-r hover:from-[#5f462d]/5 hover:to-transparent hover:shadow-md"
                           onClick={() => handleSelectUser(user)}
                         >
                           <div className="flex items-center gap-3">
@@ -396,8 +458,15 @@ export function ShareCategoryModal({
                           onClick={() => handleSelectCategory(category)}
                         >
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center text-2xl shadow-sm group-hover:shadow-md transition-shadow">
-                              {category.emoji || '📁'}
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
+                              {category.emoji ? (
+                                <TwemojiEmoji
+                                  emoji={category.emoji}
+                                  size={24}
+                                />
+                              ) : (
+                                <span className="text-2xl">📁</span>
+                              )}
                             </div>
                             <p className="font-semibold text-gray-900 flex-1 text-sm">
                               {category.name}
@@ -439,12 +508,18 @@ export function ShareCategoryModal({
                             {selectedUser.full_name || selectedUser.username}
                           </span>
                         </p>
-                        <p className="text-sm">
+                        <p className="text-sm flex items-center gap-2">
                           <span className="font-semibold text-gray-700">
                             Category:
                           </span>{' '}
-                          <span className="text-gray-900">
-                            {selectedCategory.emoji} {selectedCategory.name}
+                          <span className="text-gray-900 flex items-center gap-1">
+                            {selectedCategory.emoji && (
+                              <TwemojiEmoji
+                                emoji={selectedCategory.emoji}
+                                size={16}
+                              />
+                            )}
+                            {selectedCategory.name}
                           </span>
                         </p>
                       </div>

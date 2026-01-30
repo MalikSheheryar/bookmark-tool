@@ -101,7 +101,6 @@ body {
   color: var(--secondary-color);
   font-size: clamp(2.5rem, 6vw, 4.5rem);
   font-weight: 700;
-  margin: 0 0 1rem 0;
   text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
   letter-spacing: -0.02em;
 }
@@ -1123,7 +1122,7 @@ body {
   }
 
   .bookmark-item {
-    flex-direction: column;
+    flex-direction: row;
     align-items: flex-start;
     gap: 0.75rem;
     padding: 1rem;
@@ -1369,3 +1368,4 @@ body {
   height: 16px;
   margin-right: 0.5rem;
 }
+

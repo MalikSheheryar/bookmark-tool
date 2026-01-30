@@ -415,7 +415,7 @@ export default function InboxPage() {
         background: 'linear-gradient(135deg, #f5f5dc 0%, #f0f0e6 100%)',
       }}
     >
-      <div className="container mx-auto px-4 max-w-4xl">
+      <div className="container mx-auto px-4 max-w-4xl py-10">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">

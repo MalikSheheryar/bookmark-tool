@@ -190,7 +190,7 @@ function SubscriptionContent() {
           background: 'linear-gradient(135deg, #f5f5dc 0%, #f0f0e6 100%)',
         }}
       >
-        <div className="max-w-4xl mx-auto px-4 py-12">
+        <div className="max-w-4xl mx-auto px-4 py-15">
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-100 to-orange-100 px-6 py-3 rounded-full mb-6 shadow-lg border-2 border-amber-300">
               <Crown className="w-6 h-6 text-amber-600" />
@@ -329,7 +329,7 @@ function SubscriptionContent() {
         background: 'linear-gradient(135deg, #f5f5dc 0%, #f0f0e6 100%)',
       }}
     >
-      <div className="max-w-6xl mx-auto px-4 py-12">
+      <div className="max-w-6xl mx-auto px-4 py-15">
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 bg-white/60 backdrop-blur-sm px-4 py-2 rounded-full mb-6 shadow-sm">
             <Crown className="w-4 h-4" style={{ color: '#5f462d' }} />
