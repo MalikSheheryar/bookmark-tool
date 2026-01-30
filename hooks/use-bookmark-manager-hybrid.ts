@@ -33,6 +33,7 @@ export interface ModalState {
   categoryModal: boolean
   shareCategoryModal: boolean
   deleteModal: boolean
+  bookmarkEditModal: boolean // ✅ ADD THIS LINE
 }
 
 interface UseBookmarkManagerHybridOptions {
@@ -46,6 +47,11 @@ interface UseBookmarkManagerHybridOptions {
     newName: string,
     emoji: string | null,
     isPublic?: boolean,
+  ) => Promise<void>
+  onUpdateBookmark?: (
+    categoryName: string,
+    bookmarkIndex: number,
+    newData: { siteName: string; siteURL: string },
   ) => Promise<void>
 }
 
@@ -74,6 +80,7 @@ export function useBookmarkManagerHybrid(
     categoryModal: false,
     shareCategoryModal: false,
     deleteModal: false,
+    bookmarkEditModal: false, // ✅ ADD THIS LINE
   })
 
   const [toast, setToast] = useState<ToastState>({
@@ -326,6 +333,80 @@ export function useBookmarkManagerHybrid(
     }
   }
 
+  // Replace the updateBookmark function in use-bookmark-manager-hybrid.ts
+  // Find it around line 445 and replace with this:
+
+  const updateBookmark = useCallback(
+    async (
+      categoryName: string,
+      bookmarkIndex: number,
+      newData: { siteName: string; siteURL: string },
+    ) => {
+      try {
+        console.log('🔄 [updateBookmark] Starting update:', {
+          categoryName,
+          bookmarkIndex,
+          newData,
+        })
+
+        // Validate bookmark exists
+        const category = bookmarkData.categories[categoryName]
+        if (!category || !category[bookmarkIndex]) {
+          console.error('❌ Bookmark not found')
+          showToast('Bookmark not found', 'error')
+          return false
+        }
+
+        const oldBookmark = category[bookmarkIndex]
+        console.log('📝 Old bookmark:', oldBookmark)
+
+        // Create updated bookmarks array
+        const updatedBookmarks = [...category]
+        updatedBookmarks[bookmarkIndex] = {
+          siteName: newData.siteName,
+          siteURL: newData.siteURL,
+        }
+
+        // Update local state first
+        setBookmarkData((prev) => {
+          const updated = {
+            ...prev,
+            categories: {
+              ...prev.categories,
+              [categoryName]: updatedBookmarks,
+            },
+          }
+
+          // For guest mode, save to localStorage
+          if (!options.userId && typeof window !== 'undefined') {
+            try {
+              localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(updated))
+              console.log('💾 Saved to localStorage')
+            } catch (error) {
+              console.error('❌ Error saving to localStorage:', error)
+            }
+          }
+
+          return updated
+        })
+
+        // Sync to database if user is logged in
+        if (options.onUpdateBookmark) {
+          console.log('💾 Syncing to database...')
+          await options.onUpdateBookmark(categoryName, bookmarkIndex, newData)
+          console.log('✅ Synced to database')
+        }
+
+        showToast('Bookmark updated successfully! ✅', 'success')
+        return true
+      } catch (error) {
+        console.error('❌ Error updating bookmark:', error)
+        showToast('Failed to update bookmark ❌', 'error')
+        return false
+      }
+    },
+    [bookmarkData.categories, options, showToast],
+  )
   const normalizeURL = (url: string): string => {
     return url.startsWith('http') ? url : `https://${url}`
   }
@@ -346,7 +427,7 @@ export function useBookmarkManagerHybrid(
 
       if (!canCreateBookmark(totalBookmarks)) {
         showToast(
-          `Free tier limited to ${FREE_TIER_LIMITS.maxBookmarks} bookmarks. Upgrade to Premium for unlimited bookmarks!`,
+          `Free plan limited to ${FREE_TIER_LIMITS.maxBookmarks} links. Upgrade to Premium for unlimited access!`,
           'error',
         )
         return false
@@ -416,12 +497,14 @@ export function useBookmarkManagerHybrid(
     [bookmarkData.categories, canCreateBookmark, options, showModal, showToast],
   )
 
-  // UPDATED: createOrUpdateCategory with private category limit check
+  // This is the CRITICAL fix in use-bookmark-manager-hybrid.ts
+  // Replace the createOrUpdateCategory function (around line 420)
+
   const createOrUpdateCategory = useCallback(
     async (
       name: string,
       editingCategoryName?: string | null,
-      isPublic: boolean = false,
+      isPublic: boolean = false, // ✅ Make sure this parameter is here
     ) => {
       if (!validateCategoryName(name)) {
         showToast(
@@ -432,6 +515,7 @@ export function useBookmarkManagerHybrid(
       }
 
       if (editingCategoryName) {
+        // When editing, pass isPublic to updateCategory
         return updateCategory(editingCategoryName, name, isPublic)
       }
 
@@ -440,7 +524,7 @@ export function useBookmarkManagerHybrid(
         return false
       }
 
-      // NEW: Check private category limit for free users
+      // Check private category limit for free users
       if (!isPublic && !isPremium) {
         const currentPrivateCount = getPrivateCategoryCount()
         if (!canCreatePrivateCategory(currentPrivateCount)) {
@@ -454,19 +538,30 @@ export function useBookmarkManagerHybrid(
 
       const newOrder = bookmarkData.categoryOrder.length
 
+      // ✅ FIX: Sync to database with isPublic
       if (options.userId && options.onSyncCategory) {
         try {
-          console.log('💾 Syncing category to database:', name)
+          console.log(
+            '💾 [createOrUpdateCategory] Syncing NEW category to database:',
+            {
+              name,
+              emoji: selectedEmoji,
+              isPublic, // ✅ Log this
+            },
+          )
 
           await options.onSyncCategory({
             user_id: options.userId,
             name,
             emoji: selectedEmoji,
             category_order: newOrder,
-            is_public: isPublic,
+            is_public: isPublic, // ✅ THIS IS THE KEY FIX - pass isPublic
           })
 
-          console.log('✅ Category synced successfully')
+          console.log(
+            '✅ Category synced successfully with is_public =',
+            isPublic,
+          )
         } catch (error: any) {
           console.error('❌ Error syncing category:', error)
 
@@ -484,6 +579,7 @@ export function useBookmarkManagerHybrid(
         }
       }
 
+      // ✅ FIX: Update local state with isPublic
       setBookmarkData((prev) => {
         const updatedData = {
           ...prev,
@@ -494,11 +590,17 @@ export function useBookmarkManagerHybrid(
             : prev.categoryEmojis,
           categoryPublicStatus: {
             ...prev.categoryPublicStatus,
-            [name]: isPublic,
+            [name]: isPublic, // ✅ Set the public status
           },
         }
 
-        // For guest mode, immediately save to localStorage
+        console.log('💾 [createOrUpdateCategory] Updated local state:', {
+          categoryName: name,
+          isPublic,
+          allPublicStatus: updatedData.categoryPublicStatus,
+        })
+
+        // For guest mode, save to localStorage
         if (!options.userId && typeof window !== 'undefined') {
           try {
             localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(updatedData))
@@ -951,6 +1053,8 @@ export function useBookmarkManagerHybrid(
     reorderCategories,
     setSelectedEmoji,
     toggleCategoryVisibility,
+    updateBookmark,
+
     remainingBookmarks: getRemainingBookmarks(
       Object.values(bookmarkData.categories).reduce(
         (sum, b) => sum + b.length,

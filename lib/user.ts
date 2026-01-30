@@ -8,7 +8,7 @@ export function createUserProfileClient(
   email: string,
   fullName?: string
 ) {
-  const supabase = createClient()
+  const supabase = createClient().
 
   return supabase
     .from('users')

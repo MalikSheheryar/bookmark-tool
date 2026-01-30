@@ -94,7 +94,7 @@ body {
   position: relative;
   z-index: 2;
   text-align: center;
-  padding: 2rem 1rem;
+  padding: 0rem 1rem;
 }
 
 .bookmark-header h1 {

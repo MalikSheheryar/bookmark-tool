@@ -66,12 +66,12 @@ export default function Home() {
             style={{ color: '#5f462d' }}
           >
             Organize Your
-            <br /> Bookmarks
+            <br /> Links
           </h1>
 
           <p className="text-lg md:text-xl text-gray-600 mb-8">
-            Keep track of your favorite websites with a modern, organized
-            bookmark manager. Sign in to save your bookmarks to the cloud.
+            Keep track of your favorite websites with a modern, organized link
+            manager. Sign in to save your Links to the cloud.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
@@ -116,39 +116,39 @@ export default function Home() {
             className="text-3xl md:text-4xl font-bold text-center mb-12"
             style={{ color: '#5f462d' }}
           >
-            Why Use Our Bookmark Manager?
+            Why Use Our Link Manager?
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <FeatureCard
               icon="📁"
               title="Smart Categories"
-              description="Organize bookmarks with custom categories and emojis"
+              description="Organize your Links with custom categories and emojis"
             />
             <FeatureCard
               icon="⚡"
               title="Lightning Fast"
-              description="Instant access to all your bookmarks"
+              description="Instant access to all links"
             />
             <FeatureCard
               icon="🔄"
               title="Auto Sync"
-              description="Sync across all devices with your account"
+              description="Sync your links across all devices"
             />
             <FeatureCard
               icon="🎯"
               title="Intuitive Design"
-              description="Professional interface built for productivity"
+              description="A clean, intuitive interface built for productivity"
             />
             <FeatureCard
               icon="🔒"
               title="Privacy First"
-              description="Your data is secure and private"
+              description="Your links stay secure and private"
             />
             <FeatureCard
               icon="🚀"
               title="Drag & Drop"
-              description="Easily reorganize with drag and drop"
+              description="Easily reorder your links with drag and drop"
             />
           </div>
         </div>

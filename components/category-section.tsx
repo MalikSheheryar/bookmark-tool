@@ -37,6 +37,7 @@ interface CategorySectionProps {
   editingCategory: string | null
   onUpdateCategory: (oldName: string, newName: string) => boolean
   onToggleVisibility?: (categoryName: string) => void
+  onEditBookmark: (categoryName: string, index: number, bookmark: any) => void // ✅ ADD THIS LINE
 }
 
 interface SortableCategoryItemProps {
@@ -59,8 +60,8 @@ interface SortableCategoryItemProps {
   onSetEditingName: (name: string) => void
   onUpdateCategory: (oldName: string, newName: string) => boolean
   onToggleVisibility?: (categoryName: string) => void
+  onEditBookmark: (categoryName: string, index: number, bookmark: any) => void // ✅ ADD THIS LINE
 }
-
 // Utility function to convert emoji to Twemoji image URL
 const getEmojiImageUrl = (emoji: string) => {
   const codePoint = [...emoji]
@@ -140,6 +141,8 @@ function SortableCategoryItem({
   onShareCategory,
   onSetEditingName,
   onUpdateCategory,
+  onEditBookmark, // ✅ ADD THIS LINE
+
   onToggleVisibility,
 }: SortableCategoryItemProps) {
   const {
@@ -295,7 +298,7 @@ function SortableCategoryItem({
           {bookmarks.length === 0 ? (
             <div className="empty-state">
               <i className="fa-solid fa-bookmark"></i>
-              <p>No bookmarks in this category yet.</p>
+              <p>No Links in this category yet.</p>
             </div>
           ) : (
             bookmarks.map((bookmark, bookmarkIndex) => (
@@ -310,9 +313,28 @@ function SortableCategoryItem({
                   <span className="bookmark-name">{bookmark.siteName}</span>
                   <i className="fa-solid fa-external-link external-icon"></i>
                 </a>
-                <div className="bookmark-actions">
+                <div
+                  className="bookmark-actions"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
                   <button
                     className="action-btn"
+                    style={{ display: 'inline-flex' }}
+                    onClick={() =>
+                      onEditBookmark(categoryName, bookmarkIndex, bookmark)
+                    }
+                    title="Edit Bookmark"
+                  >
+                    <i className="fa-solid fa-edit"></i>
+                  </button>
+
+                  <button
+                    className="action-btn"
+                    style={{ display: 'inline-flex' }}
                     onClick={() =>
                       onDeleteBookmark(
                         categoryName,
@@ -345,6 +367,8 @@ export function CategorySection({
   onReorderCategories,
   editingCategory,
   onUpdateCategory,
+  onEditBookmark, // ✅ ADD THIS LINE
+
   onToggleVisibility,
 }: CategorySectionProps) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
@@ -495,6 +519,15 @@ export function CategorySection({
           background: rgba(100, 116, 139, 0.2);
         }
 
+        .category-instructions {
+          margin: 6px 0 0 0;
+          font-size: 13px;
+          color: #78716c;
+          font-weight: 500;
+          line-height: 1.5;
+          letter-spacing: 0.01em;
+        }
+
         /* Responsive adjustments */
         @media (max-width: 640px) {
           .category-icon {
@@ -520,6 +553,10 @@ export function CategorySection({
             padding: 3px 6px;
             margin-left: 4px;
           }
+
+          .category-instructions {
+            font-size: 12px;
+          }
         }
       `}</style>
 
@@ -529,21 +566,53 @@ export function CategorySection({
             <i className="fa-solid fa-folder-open me-2"></i>
             Your Categories
           </h2>
-          <button
-            onClick={onCreateCategory}
-            className="create-category-btn btn"
-          >
-            <i className="fa-solid fa-folder-plus me-2"></i>Create Category
-          </button>
+          <p className="category-instructions">
+            Click the row to open. Click the name to edit. Toggle
+            Public/Private. Drag to reorder.
+          </p>
         </div>
 
         <div className="categories-container">
           <div id="categoriesList">
             {bookmarkData.categoryOrder.length === 0 ? (
-              <div className="empty-state">
-                <i className="fa-solid fa-folder-open"></i>
-                <p>
-                  No categories yet. Create your first category to get started!
+              <div
+                className="empty-state"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  textAlign: 'center',
+                  padding: '40px 20px',
+                }}
+              >
+                <i
+                  className="fa-solid fa-folder-open"
+                  style={{
+                    fontSize: '48px',
+                    color: '#5f462d', // brown
+                    marginBottom: '12px',
+                  }}
+                ></i>
+
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: '16px',
+                    fontWeight: 600,
+                    color: '#5f462d', // brown
+                  }}
+                >
+                  No categories yet
+                </p>
+
+                <p
+                  style={{
+                    marginTop: '4px',
+                    fontSize: '13px',
+                    color: '#6b7280',
+                  }}
+                >
+                  Create your first one to get started!
                 </p>
               </div>
             ) : (
@@ -583,6 +652,7 @@ export function CategorySection({
                         onSetEditingName={setEditingName}
                         onUpdateCategory={onUpdateCategory}
                         onToggleVisibility={onToggleVisibility}
+                        onEditBookmark={onEditBookmark} // ✅ ADD THIS LINE
                       />
                     )
                   })}

@@ -46,7 +46,7 @@ export function Navbar() {
             style={{ color: '#5f462d' }}
           >
             <Bookmark className="w-5 h-5 sm:w-6 sm:h-6" />
-            <span className="hidden sm:inline">Bookmarks</span>
+            <span className="hidden sm:inline">Links</span>
           </Link>
 
           {/* Search Bar - Center on desktop */}

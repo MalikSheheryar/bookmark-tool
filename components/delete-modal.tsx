@@ -1,29 +1,52 @@
-"use client"
+'use client'
 
 interface DeleteModalProps {
   show: boolean
   onClose: () => void
   onConfirm: () => void
-  type: "category" | "bookmark" | null
+  type: 'category' | 'bookmark' | null
   target: any
   bookmarkCount?: number
 }
 
-export function DeleteModal({ show, onClose, onConfirm, type, target, bookmarkCount = 0 }: DeleteModalProps) {
+export function DeleteModal({
+  show,
+  onClose,
+  onConfirm,
+  type,
+  target,
+  bookmarkCount = 0,
+}: DeleteModalProps) {
   if (!show) return null
 
   const getMessage = () => {
-    if (type === "category") {
-      return `Are you sure you want to delete the category "${target}" and all its ${bookmarkCount} bookmarks? This action cannot be undone.`
-    } else if (type === "bookmark") {
-      return `Are you sure you want to delete the bookmark "${target?.name || "this bookmark"}"? This action cannot be undone.`
+    if (type === 'category') {
+      return (
+        <>
+          Are you sure you want to delete the category "{target}" and all{' '}
+          {bookmarkCount} links?
+          <br />
+          This action cannot be undone.
+        </>
+      )
     }
-    return ""
+
+    if (type === 'bookmark') {
+      return (
+        <>
+          Are you sure you want to delete this link?
+          <br />
+          This action cannot be undone.
+        </>
+      )
+    }
+
+    return null
   }
 
   return (
     <div
-      className={`modal-overlay ${show ? "show" : ""}`}
+      className={`modal-overlay ${show ? 'show' : ''}`}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}

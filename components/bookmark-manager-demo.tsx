@@ -201,6 +201,39 @@ export default function BookmarkManager() {
           }
         }
       : undefined,
+    onUpdateBookmark: dbUser?.id
+      ? async (categoryName, bookmarkIndex, newData) => {
+          const { createClient } = await import('@/lib/supabase-client')
+          const supabase = createClient()
+
+          try {
+            const oldBookmark =
+              bookmarkData.categories[categoryName][bookmarkIndex]
+
+            console.log('🔄 Updating bookmark in database:', {
+              old: oldBookmark,
+              new: newData,
+            })
+
+            const { error } = await supabase
+              .from('bookmarks')
+              .update({
+                site_name: newData.siteName,
+                site_url: newData.siteURL,
+              })
+              .eq('user_id', dbUser.id)
+              .eq('category_name', categoryName)
+              .eq('site_name', oldBookmark.siteName)
+
+            if (error) throw error
+
+            console.log('✅ Bookmark updated in database')
+          } catch (error) {
+            console.error('❌ Error updating bookmark:', error)
+            throw error
+          }
+        }
+      : undefined,
     onDeleteCategory: dbUser?.id
       ? async (categoryName) => {
           const { createClient } = await import('@/lib/supabase-client')
@@ -298,7 +331,6 @@ export default function BookmarkManager() {
           </p>
         </div>
       </header>
-
 
       <main className="main-wrapper">
         <div className="main-container">

@@ -1,4 +1,4 @@
-// File: app/inbox/page.tsx (UPDATED with Reactions)
+// File: app/inbox/page.tsx (UPDATED - Mark as read when viewing shared category)
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
@@ -46,10 +46,10 @@ export default function InboxPage() {
   const [showShareModal, setShowShareModal] = useState(false)
   const [processing, setProcessing] = useState<string | null>(null)
   const [newMessageAnimation, setNewMessageAnimation] = useState<string | null>(
-    null
+    null,
   )
 
-  // ✅ NEW: Reactions state
+  // Reactions state
   const [messageReactions, setMessageReactions] = useState<
     Record<string, Reaction[]>
   >({})
@@ -81,7 +81,7 @@ export default function InboxPage() {
       console.log('✅ [InboxPage] Fetched', data.length, 'messages')
       setMessages(data)
 
-      // ✅ NEW: Fetch reactions for all messages
+      // Fetch reactions for all messages
       if (data.length > 0) {
         fetchAllReactions(data.map((m) => m.id))
       }
@@ -92,7 +92,7 @@ export default function InboxPage() {
     }
   }, [dbUser?.id, filter])
 
-  // ✅ NEW: Fetch reactions for all messages
+  // Fetch reactions for all messages
   const fetchAllReactions = async (messageIds: string[]) => {
     if (!dbUser?.id) return
 
@@ -106,7 +106,7 @@ export default function InboxPage() {
     setMessageReactions(reactionsMap)
   }
 
-  // ✅ NEW: Setup realtime for reactions
+  // Setup realtime for reactions
   const setupReactionRealtime = (messageId: string) => {
     if (reactionChannels[messageId]) return // Already subscribed
 
@@ -125,7 +125,7 @@ export default function InboxPage() {
     }))
   }
 
-  // ✅ NEW: Handle reaction toggle
+  // Handle reaction toggle
   const handleReactionToggle = async (messageId: string, emoji: string) => {
     if (!dbUser?.id) return
 
@@ -140,6 +140,41 @@ export default function InboxPage() {
       }))
     } catch (error) {
       console.error('❌ Error toggling reaction:', error)
+    }
+  }
+
+  // ✅ NEW: Handle viewing shared category (mark as read)
+  const handleViewCategory = async (
+    e: React.MouseEvent<HTMLAnchorElement>,
+    messageId: string,
+    isRead: boolean,
+  ) => {
+    // Don't prevent default - allow link to open
+    // But if message is unread, mark it as read
+
+    if (!isRead && dbUser?.id) {
+      console.log(
+        '👁️ [InboxPage] User viewing category - marking as read:',
+        messageId,
+      )
+
+      // INSTANT optimistic update - mark as read in UI
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId ? { ...msg, is_read: true } : msg,
+        ),
+      )
+
+      // Mark as read on server (fire and forget for better UX)
+      markMessageAsRead(messageId, dbUser.id).catch((error) => {
+        console.error('❌ Error marking message as read:', error)
+        // Revert on error
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId ? { ...msg, is_read: false } : msg,
+          ),
+        )
+      })
     }
   }
 
@@ -192,7 +227,7 @@ export default function InboxPage() {
             badge: '/favicon.ico',
           })
         }
-      }
+      },
     )
 
     // Subscribe to message UPDATES (mark as read, delete, etc)
@@ -201,16 +236,16 @@ export default function InboxPage() {
       (updatedMessage) => {
         console.log(
           '🔄 [InboxPage] Message updated via Realtime!',
-          updatedMessage
+          updatedMessage,
         )
 
         // INSTANT optimistic update
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === updatedMessage.id ? { ...msg, ...updatedMessage } : msg
-          )
+            msg.id === updatedMessage.id ? { ...msg, ...updatedMessage } : msg,
+          ),
         )
-      }
+      },
     )
 
     console.log('✅ [InboxPage] Realtime subscriptions active')
@@ -224,14 +259,14 @@ export default function InboxPage() {
         unsubscribeFromInbox(updateChannelRef.current)
       }
 
-      // ✅ NEW: Cleanup reaction channels
+      // Cleanup reaction channels
       Object.values(reactionChannels).forEach((channel) => {
         channel.unsubscribe()
       })
     }
   }, [dbUser?.id, fetchMessages])
 
-  // ✅ NEW: Setup reaction realtime for visible messages
+  // Setup reaction realtime for visible messages
   useEffect(() => {
     messages.forEach((message) => {
       setupReactionRealtime(message.id)
@@ -251,14 +286,14 @@ export default function InboxPage() {
   const handleMarkAsRead = async (messageId: string) => {
     if (!dbUser?.id) return
 
-    console.log('✅ [InboxPage] Marking as read:', messageId)
+    console.log('✅ [InboxPage] Manually marking as read:', messageId)
     setProcessing(messageId)
 
     // INSTANT optimistic update
     setMessages((prev) =>
       prev.map((msg) =>
-        msg.id === messageId ? { ...msg, is_read: true } : msg
-      )
+        msg.id === messageId ? { ...msg, is_read: true } : msg,
+      ),
     )
 
     try {
@@ -268,8 +303,8 @@ export default function InboxPage() {
         console.error('❌ Failed to mark as read, reverting')
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === messageId ? { ...msg, is_read: false } : msg
-          )
+            msg.id === messageId ? { ...msg, is_read: false } : msg,
+          ),
         )
       }
     } catch (error) {
@@ -277,8 +312,8 @@ export default function InboxPage() {
       // Revert on error
       setMessages((prev) =>
         prev.map((msg) =>
-          msg.id === messageId ? { ...msg, is_read: false } : msg
-        )
+          msg.id === messageId ? { ...msg, is_read: false } : msg,
+        ),
       )
     } finally {
       setProcessing(null)
@@ -289,7 +324,7 @@ export default function InboxPage() {
   const handleMarkAllAsRead = async () => {
     if (!dbUser?.id) return
 
-    console.log('✅ [InboxPage] Marking all as read')
+    console.log('✅ [InboxPage] Manually marking all as read')
     setProcessing('all')
 
     // INSTANT optimistic update
@@ -399,7 +434,7 @@ export default function InboxPage() {
                   ? `${unreadCount} unread message${
                       unreadCount !== 1 ? 's' : ''
                     }`
-                  : 'All caught up!'}
+                  : ''}
               </p>
             </div>
           </div>
@@ -468,7 +503,9 @@ export default function InboxPage() {
               {filter === 'unread' ? '✅' : '📭'}
             </div>
             <h3 className="text-xl font-bold mb-2" style={{ color: '#5f462d' }}>
-              {filter === 'unread' ? 'All Caught Up!' : 'No Messages Yet'}
+              {filter === 'unread'
+                ? "You're all caught up!"
+                : 'No Messages Yet'}
             </h3>
             <p className="text-gray-600 mb-6">
               {filter === 'unread'
@@ -566,7 +603,7 @@ export default function InboxPage() {
                       </div>
                     </div>
 
-                    {/* Shared Category */}
+                    {/* Shared Category - ✅ UPDATED: Mark as read on click */}
                     <div className="bg-gray-50 rounded-lg p-4 mb-3">
                       <div className="flex items-center justify-between">
                         <div>
@@ -581,6 +618,9 @@ export default function InboxPage() {
                           href={message.category_url}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={(e) =>
+                            handleViewCategory(e, message.id, message.is_read)
+                          }
                           className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium transition-all hover:shadow-md hover:scale-105"
                           style={{ background: '#5f462d' }}
                         >
@@ -599,7 +639,7 @@ export default function InboxPage() {
                       </div>
                     )}
 
-                    {/* ✅ NEW: Reactions Section */}
+                    {/* Reactions Section */}
                     <div className="flex items-center gap-3 pt-3 border-t border-gray-100">
                       <ReactionPicker
                         onSelect={(emoji) =>

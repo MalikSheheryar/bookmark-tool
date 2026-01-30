@@ -45,7 +45,7 @@ export function ShareCategoryModal({
   const [selectedUser, setSelectedUser] = useState<UserOption | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
-    null
+    null,
   )
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
@@ -75,7 +75,7 @@ export function ShareCategoryModal({
         try {
           const results = await searchUsersForSharing(
             searchQuery.trim(),
-            currentUserId
+            currentUserId,
           )
           setUserResults(results)
         } catch (error) {
@@ -200,11 +200,11 @@ export function ShareCategoryModal({
                 />
               </div>
               <h3 className="text-3xl font-bold mb-3 bg-gradient-to-r from-[#5f462d] to-[#7d5e3f] bg-clip-text text-transparent">
-                Share Sent Successfully!
+                Shared Successfully!
               </h3>
               <p className="text-gray-600 text-lg">
-                {selectedUser?.full_name || selectedUser?.username} will receive
-                your category share
+                Your category has been sent to{' '}
+                {selectedUser?.full_name || selectedUser?.username}.
               </p>
             </div>
           ) : (
@@ -236,8 +236,8 @@ export function ShareCategoryModal({
                           step > stepNum + 1
                             ? 'bg-gradient-to-r from-green-400 to-green-600'
                             : step === stepNum + 1
-                            ? 'bg-gradient-to-r from-[#5f462d] to-[#7d5e3f]'
-                            : 'bg-gray-200'
+                              ? 'bg-gradient-to-r from-[#5f462d] to-[#7d5e3f]'
+                              : 'bg-gray-200'
                         }`}
                       />
                     )}
@@ -452,11 +452,11 @@ export function ShareCategoryModal({
                   )}
 
                   <label className="block text-sm font-bold text-gray-700 mb-3">
-                    Personal Message
+                    Add a personal message
                   </label>
                   <textarea
                     className="w-full px-5 py-4 border-2 border-gray-200 rounded-2xl resize-none focus:outline-none focus:border-[#5f462d] focus:ring-4 focus:ring-[#5f462d]/10 transition-all duration-200 text-base shadow-sm"
-                    placeholder="e.g., Check out these amazing resources, I think you'll find them useful!"
+                    placeholder="e.g., Thought you might like these links 👀"
                     value={note}
                     onChange={(e) => setNote(e.target.value.slice(0, 100))}
                     maxLength={100}
@@ -464,7 +464,7 @@ export function ShareCategoryModal({
                   />
                   <div className="flex items-center justify-between mt-3">
                     <p className="text-xs text-gray-500">
-                      Make it personal and friendly
+                      Optional — add a message for the recipient.{' '}
                     </p>
                     <span
                       className={`text-sm font-medium transition-colors ${
@@ -515,7 +515,7 @@ export function ShareCategoryModal({
                 ) : (
                   <>
                     <Send className="w-5 h-5" />
-                    Send Share
+                    Send Links
                   </>
                 )}
               </button>

@@ -88,7 +88,7 @@ export default function DashboardPage() {
       }}
     >
       {/* Added proper padding to account for fixed navbar */}
-      <div className="pt-20">
+      <div className="pt-18">
         <BookmarkManager userId={user.id} />
       </div>
     </div>

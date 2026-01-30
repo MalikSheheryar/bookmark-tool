@@ -57,7 +57,7 @@ export default function SharedCategoryPage() {
 
         const endTime = performance.now()
         console.log(
-          `⏱️  Fetch completed in ${(endTime - startTime).toFixed(2)}ms`
+          `⏱️  Fetch completed in ${(endTime - startTime).toFixed(2)}ms`,
         )
 
         console.log('📦 Result from getSharedCategoryData:')
@@ -72,7 +72,7 @@ export default function SharedCategoryPage() {
 
           setData(result)
           setDebugInfo(
-            `Success! Category: ${result.category_name}, Sender: ${result.sender_username}`
+            `Success! Category: ${result.category_name}, Sender: ${result.sender_username}`,
           )
 
           console.log('✅ [SharedCategoryPage] Data set successfully')
@@ -92,13 +92,13 @@ export default function SharedCategoryPage() {
         console.error('   Error Type:', err?.constructor?.name)
         console.error(
           '   Error Message:',
-          err instanceof Error ? err.message : String(err)
+          err instanceof Error ? err.message : String(err),
         )
         console.error('   Stack:', err instanceof Error ? err.stack : 'N/A')
 
         setError('Failed to load shared category')
         setDebugInfo(
-          `Exception: ${err instanceof Error ? err.message : String(err)}`
+          `Exception: ${err instanceof Error ? err.message : String(err)}`,
         )
       } finally {
         setLoading(false)
@@ -325,7 +325,7 @@ export default function SharedCategoryPage() {
               </h2>
               <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
                 <Bookmark className="w-4 h-4" />
-                {data.bookmarks?.length || 0} bookmark
+                {data.bookmarks?.length || 0} Link
                 {(data.bookmarks?.length || 0) !== 1 ? 's' : ''}
               </div>
             </div>
@@ -336,10 +336,10 @@ export default function SharedCategoryPage() {
             <div className="text-center py-12">
               <div className="text-5xl mb-4">📚</div>
               <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                No Bookmarks Yet
+                No Links Yet
               </h3>
               <p className="text-gray-500">
-                This category doesn't have any bookmarks yet
+                This category doesn't have any Links yet
               </p>
             </div>
           ) : (
@@ -372,14 +372,15 @@ export default function SharedCategoryPage() {
         {/* Footer */}
         <div className="text-center mt-8">
           <p className="text-sm text-gray-600 mb-4">
-            Like what you see? Create your own bookmark collections!
+            Like what you see? Create and organise your own link
+            collections.{' '}
           </p>
           <Link
             href="/"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-lg text-white font-semibold transition-all hover:shadow-lg"
             style={{ background: '#5f462d' }}
           >
-            Get Started →
+            Continue →
           </Link>
         </div>
       </div>

@@ -98,7 +98,7 @@ export default function PublicProfilePage() {
         setLoadingBookmarks(true)
         const data = await getPublicCategoryBookmarks(
           username,
-          selectedCategory
+          selectedCategory,
         )
         setBookmarks(data)
       } catch (err) {
@@ -145,7 +145,7 @@ export default function PublicProfilePage() {
   // ✅ NEW: Handle category reaction toggle
   const handleCategoryReactionToggle = async (
     categoryId: string,
-    emoji: string
+    emoji: string,
   ) => {
     if (!dbUser?.id) {
       alert('Please log in to react')
@@ -510,7 +510,7 @@ export default function PublicProfilePage() {
                   <div className="text-center py-12">
                     <div className="text-5xl mb-4">📚</div>
                     <p className="text-gray-600">
-                      No bookmarks in this category yet
+                      No Links in this category yet
                     </p>
                   </div>
                 ) : (

@@ -8,6 +8,177 @@ interface BookmarkFormProps {
   categories: string[]
   onSubmit: (data: { name: string; url: string; category: string }) => boolean
   bookmarkData: any
+  onCreateCategory: () => void
+}
+
+// ✅ ErrorModal Component
+interface ErrorModalProps {
+  show: boolean
+  onClose: () => void
+}
+
+function ErrorModal({ show, onClose }: ErrorModalProps) {
+  if (!show) return null
+
+  return (
+    <>
+      <style jsx>{`
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+          opacity: 0;
+          transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.show {
+          opacity: 1;
+        }
+
+        .modal-content {
+          background: white;
+          border-radius: 16px;
+          padding: 0;
+          max-width: 500px;
+          width: 90%;
+          max-height: 90vh;
+          overflow-y: auto;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+          animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+          from {
+            transform: translateY(20px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+
+        .modal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 20px 24px;
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        .modal-title {
+          margin: 0;
+          font-size: 1.25rem;
+          font-weight: 600;
+          color: #1f2937;
+          display: flex;
+          align-items: center;
+        }
+
+        .modal-close {
+          background: none;
+          border: none;
+          font-size: 1.5rem;
+          color: #6b7280;
+          cursor: pointer;
+          padding: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 6px;
+          transition: all 0.2s ease;
+        }
+
+        .modal-close:hover {
+          background: #f3f4f6;
+          color: #1f2937;
+        }
+
+        .modal-body {
+          padding: 24px;
+        }
+
+        .modal-body p {
+          margin: 0 0 16px 0;
+          color: #374151;
+          line-height: 1.6;
+        }
+
+        .modal-body ul {
+          margin: 0;
+          padding-left: 20px;
+          color: #374151;
+        }
+
+        .modal-body li {
+          margin: 8px 0;
+          line-height: 1.6;
+        }
+
+        .modal-body strong {
+          color: #1f2937;
+          font-weight: 600;
+        }
+      `}</style>
+
+      <div
+        className={`modal-overlay ${show ? 'show' : ''}`}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose()
+        }}
+      >
+        <div className="modal-content">
+          <div className="modal-header">
+            <h3 className="modal-title">
+              <span className="me-2">😊</span>
+              Oops — almost there!
+            </h3>
+
+            <button className="modal-close" onClick={onClose}>
+              <i className="fa-solid fa-times"></i>
+            </button>
+          </div>
+          <div className="modal-body">
+            <p>
+              <strong>Please check the following requirements:</strong>
+            </p>
+            <ul>
+              <li>
+                <strong>Link name:</strong>
+                <ul>
+                  <li>Must be at least 2 characters long</li>
+                  <li>Only letters, numbers and spaces are allowed</li>
+                  <li>Cannot start or end with a space</li>
+                </ul>
+              </li>
+              <li>
+                <strong>Website URL:</strong>
+                <ul>
+                  <li>Must be a valid URL format</li>
+                  <li>https:// will be added automatically if missing</li>
+                </ul>
+              </li>
+              <li>
+                <strong>Category:</strong>
+                <ul>
+                  <li>
+                    Please select an existing category or create a new one
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </>
+  )
 }
 
 // Utility function to convert emoji to Twemoji image URL
@@ -82,6 +253,7 @@ export function BookmarkForm({
   categories,
   onSubmit,
   bookmarkData,
+  onCreateCategory,
 }: BookmarkFormProps) {
   const [formData, setFormData] = useState({
     name: '',
@@ -96,7 +268,7 @@ export function BookmarkForm({
   })
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string>('')
+  const [showErrorModal, setShowErrorModal] = useState(false) // ✅ NEW: State for error modal
 
   // Function to normalize URL by adding https:// if missing
   const normalizeURL = (url: string): string => {
@@ -153,7 +325,6 @@ export function BookmarkForm({
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
-    setErrorMessage('') // Clear error message on input change
 
     let validationClass = ''
     if (field === 'name' && value) {
@@ -169,42 +340,18 @@ export function BookmarkForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    setErrorMessage('')
 
     // Validate all fields before submitting
-    const errors: string[] = []
+    const hasErrors =
+      !formData.name.trim() ||
+      !validateBookmarkName(formData.name) ||
+      !formData.url.trim() ||
+      !validateURL(formData.url) ||
+      !formData.category
 
-    // Validate name
-    if (!formData.name.trim()) {
-      errors.push('❌ Link name is required')
-    } else if (!validateBookmarkName(formData.name)) {
-      const trimmed = formData.name.trim()
-      if (formData.name.startsWith(' ') || formData.name.endsWith(' ')) {
-        errors.push('❌ Link name cannot start or end with a space')
-      } else if (trimmed.length < 2) {
-        errors.push('❌ Link name must be at least 2 characters long')
-      } else if (!/^[a-zA-Z0-9\s]+$/.test(trimmed)) {
-        errors.push('❌ Link name can only contain letters, numbers and spaces')
-      }
-    }
-
-    // Validate URL
-    if (!formData.url.trim()) {
-      errors.push('❌ Website URL is required')
-    } else if (!validateURL(formData.url)) {
-      errors.push(
-        '❌ Website URL is not valid (e.g., google.com or https://google.com)',
-      )
-    }
-
-    // Validate category
-    if (!formData.category) {
-      errors.push('❌ Please select a category')
-    }
-
-    // If there are validation errors, show them
-    if (errors.length > 0) {
-      setErrorMessage(errors.join('\n'))
+    // If there are validation errors, show error modal
+    if (hasErrors) {
+      setShowErrorModal(true) // ✅ Show the modal instead of inline error
       // Update validation states to show errors
       setValidation({
         name: formData.name
@@ -239,11 +386,9 @@ export function BookmarkForm({
       // Reset form on success
       setFormData({ name: '', url: '', category: '' })
       setValidation({ name: '', url: '', category: '' })
-      setErrorMessage('')
     } else {
-      setErrorMessage(
-        '❌ Failed to create bookmark. This link might already exist in this category.',
-      )
+      // Show error modal if submission failed
+      setShowErrorModal(true)
     }
   }
 
@@ -332,16 +477,46 @@ export function BookmarkForm({
           margin-right: 6px;
         }
 
-        .error-message {
-          background: #fee;
-          border: 1px solid #fcc;
-          border-radius: 8px;
-          padding: 12px 16px;
-          margin-bottom: 16px;
-          color: #c33;
-          font-size: 14px;
-          white-space: pre-line;
-          line-height: 1.6;
+        .create-category-top-section {
+          text-align: center;
+          margin-bottom: 1.5rem;
+        }
+
+        .create-category-top-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.5rem 3rem;
+          background: linear-gradient(
+            135deg,
+            var(--main-color) 0%,
+            hsl(var(--primary-h), var(--primary-s), 32%) 100%
+          );
+          color: var(--secondary-color);
+          font-size: 1.5rem;
+          font-weight: 600;
+          border: none;
+          border-radius: 12px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          box-shadow: 0 4px 12px rgba(139, 115, 85, 0.3);
+          margin-bottom: 0.75rem;
+        }
+
+        .create-category-top-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(139, 115, 85, 0.4);
+          background: linear-gradient(135deg, #9d8266 0%, #7a6352 100%);
+        }
+
+        .create-category-top-btn:active {
+          transform: translateY(0);
+        }
+
+        .start-saving-text {
+          font-size: 0.85rem;
+          color: #6b7280;
+          margin: 0;
         }
 
         @media (max-width: 640px) {
@@ -354,13 +529,39 @@ export function BookmarkForm({
             width: 16px !important;
             height: 16px !important;
           }
+
+          .create-category-top-btn {
+            padding: 0.65rem 1.5rem;
+            font-size: 0.95rem;
+          }
+
+          .start-saving-text {
+            font-size: 0.875rem;
+          }
         }
       `}</style>
 
-      <section className="bookmark-inputs">
-        <form onSubmit={handleSubmit}>
-          {errorMessage && <div className="error-message">{errorMessage}</div>}
+      {/* ✅ Error Modal */}
+      <ErrorModal
+        show={showErrorModal}
+        onClose={() => setShowErrorModal(false)}
+      />
 
+      <section className="bookmark-inputs">
+        {/* Create Category Button at Top */}
+        <div className="create-category-top-section">
+          <button
+            type="button"
+            onClick={onCreateCategory}
+            className="create-category-top-btn"
+          >
+            <i className="fa-solid fa-plus"></i>
+            Create Category
+          </button>
+          <p className="start-saving-text">Now start saving links</p>
+        </div>
+
+        <form onSubmit={handleSubmit}>
           <div className="row input-row">
             <div className="col-lg-4 col-md-6">
               <div className="modern-input-group">
@@ -468,9 +669,45 @@ export function BookmarkForm({
                 {isDropdownOpen && (
                   <div className="modern-dropdown-menu">
                     {categories.length === 0 ? (
-                      <div className="dropdown-empty">
-                        <i className="fa-solid fa-folder-plus"></i>
-                        <span>No categories yet. Create one first!</span>
+                      <div
+                        className="dropdown-empty"
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          textAlign: 'center',
+                          padding: '30px 20px',
+                        }}
+                      >
+                        <i
+                          className="fa-solid fa-folder-plus"
+                          style={{
+                            fontSize: '32px',
+                            color: '#5f462d',
+                            marginBottom: '12px',
+                          }}
+                        ></i>
+
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: '16px',
+                            fontWeight: 600,
+                            color: '#5f462d',
+                          }}
+                        >
+                          No categories yet
+                        </p>
+
+                        <p
+                          style={{
+                            marginTop: '4px',
+                            fontSize: '13px',
+                            color: '#6b7280',
+                          }}
+                        >
+                          Create one to get started!
+                        </p>
                       </div>
                     ) : (
                       categories.map((category) => (
@@ -500,7 +737,7 @@ export function BookmarkForm({
             </div>
           </div>
           <button type="submit" className="submit-btn">
-            <i className="fa-solid fa-plus me-2"></i>Add Bookmark
+            <i className="fa-solid fa-plus me-2"></i>Add Link
           </button>
         </form>
       </section>

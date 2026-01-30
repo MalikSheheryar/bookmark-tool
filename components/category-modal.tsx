@@ -1096,7 +1096,7 @@ export function CategoryModal({
   currentPrivateCategoryCount, // NEW: Receive count
 }: CategoryModalProps) {
   const [categoryName, setCategoryName] = useState('')
-  const [isPublic, setIsPublic] = useState(false)
+  const [isPublic, setIsPublic] = useState(true)
   const [showPrivateLimitWarning, setShowPrivateLimitWarning] = useState(false) // NEW
 
   const modalRef = useRef<HTMLDivElement>(null)
@@ -1109,7 +1109,8 @@ export function CategoryModal({
   useEffect(() => {
     if (show) {
       setCategoryName(editingCategory || '')
-      setIsPublic(currentIsPublic)
+      // ✅ When editing, use currentIsPublic; when creating new, default to true (public)
+      setIsPublic(editingCategory ? currentIsPublic : true)
       setShowPrivateLimitWarning(false)
     }
   }, [show, editingCategory, currentIsPublic])
@@ -1842,8 +1843,8 @@ export function CategoryModal({
                 </span>
                 <span>
                   {isPublic
-                    ? 'This category and its bookmarks will be visible on your public profile.'
-                    : 'This category and its bookmarks will only be visible to you.'}
+                    ? 'This category and its links will be visible on your public profile.'
+                    : 'This category and its links will only be visible to you.'}
                 </span>
               </div>
             </div>
