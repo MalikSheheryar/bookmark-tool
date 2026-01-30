@@ -70,7 +70,7 @@ export default function Home() {
           </h1>
 
           <p className="text-lg md:text-xl text-gray-600 mb-8">
-            Keep track of your favorite websites with a modern, organized link
+            Keep track of your favourite websites with a modern, organized link
             manager. Sign in to save your links.
           </p>
 
