@@ -57,7 +57,7 @@ export default function Home() {
           <div className="inline-flex items-center gap-2 bg-white/60 backdrop-blur-sm px-4 py-2 rounded-full mb-6 shadow-sm">
             <Sparkles className="w-4 h-4" style={{ color: '#5f462d' }} />
             <span className="text-sm font-medium" style={{ color: '#5f462d' }}>
-              Organize Your Digital Life
+              Organise Your Digital Life
             </span>
           </div>
 
@@ -65,12 +65,12 @@ export default function Home() {
             className="text-5xl md:text-7xl font-bold mb-6"
             style={{ color: '#5f462d' }}
           >
-            Organize Your
+            Organise Your
             <br /> Links
           </h1>
 
           <p className="text-lg md:text-xl text-gray-600 mb-8">
-            Keep track of your favourite websites with a modern, organized link
+            Keep track of your favourite websites with a modern, organised link
             manager. Sign in to save your links.
           </p>
 
@@ -123,7 +123,7 @@ export default function Home() {
             <FeatureCard
               icon="📁"
               title="Smart Categories"
-              description="Organize your Links with custom categories and emojis"
+              description="Organise your Links with custom categories and emojis"
             />
             <FeatureCard
               icon="⚡"
