@@ -11,7 +11,7 @@ const tektur = Tektur({
 })
 
 export const metadata = {
-  title: 'Bookmark Manager',
+  title: 'Link Manager',
   description:
     'Organize your favorite sites with categories and drag-and-drop functionality',
 }

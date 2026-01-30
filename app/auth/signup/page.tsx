@@ -205,7 +205,7 @@ export default function SignUpPage() {
               Create Account
             </h1>
             <p className="text-gray-600 mt-2 text-sm">
-              Join us to organize your bookmarks
+              Join us to organize your links
             </p>
           </div>
 

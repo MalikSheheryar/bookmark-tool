@@ -107,7 +107,7 @@ export default function LoginPage() {
           <h1 className="text-3xl font-bold" style={{ color: '#5f462d' }}>
             Sign In
           </h1>
-          <p className="text-gray-600 mt-2 text-sm">Access your bookmarks</p>
+          <p className="text-gray-600 mt-2 text-sm">Access your links</p>
         </div>
 
         {successMessage && (

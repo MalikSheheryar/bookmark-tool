@@ -1,3 +1,4 @@
+// File: components/profile-view.tsx (UPDATED - with Delete Account)
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -32,6 +33,8 @@ import {
   checkUsernameAvailable,
   generateUsername,
 } from '@/lib/public-profile-service'
+import { DeleteAccountModal } from '@/components/delete-account-modal'
+import { deleteUserAccount } from '@/lib/account-deletion-service'
 
 interface ProfileViewProps {
   userId: string
@@ -50,6 +53,9 @@ export default function ProfileView({
   const [uploadingPicture, setUploadingPicture] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  // ✅ NEW: Delete account modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   const [userProfile, setUserProfile] = useState<any>({
     full_name: '',
@@ -325,6 +331,33 @@ export default function ProfileView({
     setError(null)
   }
 
+  // ✅ Handle account deletion - pass auth_id (user.id from auth context)
+  const handleDeleteAccount = async () => {
+    try {
+      console.log('🗑️ User confirmed account deletion')
+
+      // userId here is actually the auth_id
+      await deleteUserAccount(userId)
+
+      // Clear local storage
+      if (typeof window !== 'undefined') {
+        localStorage.clear()
+      }
+
+      // Sign out and redirect
+      await logout()
+      router.push('/')
+    } catch (error) {
+      console.error('❌ Error deleting account:', error)
+      setError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to delete account. Please try again.',
+      )
+      setShowDeleteModal(false)
+      setTimeout(() => setError(null), 5000)
+    }
+  }
   const getInitials = () => {
     const name = userProfile.full_name || userEmail || 'User'
     if (!name) return 'U'
@@ -502,7 +535,6 @@ export default function ProfileView({
 
                 {userProfile.bio && !isEditing && (
                   <p className="text-gray-600 mt-2 text-sm leading-relaxed max-w-md break-words whitespace-pre-wrap">
-                    {' '}
                     {userProfile.bio}
                   </p>
                 )}
@@ -800,7 +832,7 @@ export default function ProfileView({
       </div>
 
       {/* Quick Links */}
-      <div className="bg-white rounded-lg shadow-lg p-8 border border-gray-200">
+      <div className="bg-white rounded-lg shadow-lg p-8 border border-gray-200 mb-8">
         <h2 className="text-2xl font-bold mb-6" style={{ color: '#5f462d' }}>
           My Links
         </h2>
@@ -821,6 +853,26 @@ export default function ProfileView({
           </Link>
         </div>
       </div>
+
+      {/* ✅ NEW: Delete Account Section */}
+      <div className="bg-white rounded-lg shadow-lg p-8 border border-red-200 mb-8">
+        <h2 className="text-2xl font-bold mb-4 text-red-600">Danger Zone</h2>
+
+        <button
+          onClick={() => setShowDeleteModal(true)}
+          className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all hover:shadow-lg"
+        >
+          <Trash2 className="w-5 h-5" />
+          Delete My Account
+        </button>
+      </div>
+
+      {/* ✅ NEW: Delete Account Modal */}
+      <DeleteAccountModal
+        show={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteAccount}
+      />
     </div>
   )
 }

@@ -1,19 +1,27 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/components/auth-provider'
 import { BookmarkForm } from '@/components/bookmark-form'
-import { CategorySection } from '@/components/category-section'
+import { CategorySection } from '@/components/category-section-demo'
 import { ErrorModal } from '@/components/error-modal'
 import { CategoryModal } from '@/components/category-modal-demo'
 import { ShareModal } from '@/components/share-modal'
 import { DeleteModal } from '@/components/delete-modal'
+import { BookmarkEditModal } from '@/components/bookmark-edit-modal'
 import { Toast } from '@/components/toast'
 import { useBookmarkManagerHybrid } from '@/hooks/use-bookmark-manager-hybrid'
 import '@/styles/bookmark-manager.css'
 
 export default function BookmarkManager() {
   const { dbUser, isLoading: authLoading } = useAuth()
+
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingBookmark, setEditingBookmark] = useState<{
+    categoryName: string
+    index: number
+    bookmark: any
+  } | null>(null)
 
   const {
     bookmarkData,
@@ -32,11 +40,14 @@ export default function BookmarkManager() {
     updateCategory,
     deleteCategory,
     deleteBookmark,
+    updateBookmark,
     toggleCategory,
     startEditingCategory,
     shareCategory,
     reorderCategories,
     setSelectedEmoji,
+    toggleCategoryVisibility,
+    getPrivateCategoryCount,
   } = useBookmarkManagerHybrid({
     userId: dbUser?.id,
     onSyncBookmark: dbUser?.id
@@ -45,8 +56,6 @@ export default function BookmarkManager() {
           const supabase = createClient()
 
           try {
-            console.log('💾 Inserting bookmark into database:', bookmark)
-
             const { data, error } = await supabase
               .from('bookmarks')
               .insert({
@@ -57,12 +66,7 @@ export default function BookmarkManager() {
               })
               .select()
 
-            if (error) {
-              console.error('❌ Supabase error:', error)
-              throw error
-            }
-
-            console.log('✅ Bookmark inserted successfully:', data)
+            if (error) throw error
           } catch (error) {
             console.error('❌ Error syncing bookmark:', error)
             throw error
@@ -75,9 +79,11 @@ export default function BookmarkManager() {
           const supabase = createClient()
 
           try {
-            console.log('💾 Inserting category into database:', category)
+            console.log(
+              '💾 [onSyncCategory] Syncing category with data:',
+              category,
+            )
 
-            // Check if category already exists
             const { data: existingCategory } = await supabase
               .from('categories')
               .select('id')
@@ -86,7 +92,6 @@ export default function BookmarkManager() {
               .maybeSingle()
 
             if (existingCategory) {
-              console.log('⚠️ Category already exists, skipping insert')
               throw new Error('Category already exists')
             }
 
@@ -97,15 +102,16 @@ export default function BookmarkManager() {
                 name: category.name,
                 emoji: category.emoji,
                 category_order: category.category_order,
+                is_public: true, // ✅ Always public by default
               })
               .select()
 
             if (error) {
-              console.error('❌ Supabase error:', error)
+              console.error('❌ Database error:', error)
               throw error
             }
 
-            console.log('✅ Category inserted successfully:', data)
+            console.log('✅ Category synced successfully:', data)
           } catch (error) {
             console.error('❌ Error syncing category:', error)
             throw error
@@ -113,54 +119,50 @@ export default function BookmarkManager() {
         }
       : undefined,
     onUpdateCategory: dbUser?.id
-      ? async (oldName, newName, emoji) => {
+      ? async (oldName, newName, emoji, isPublic) => {
           const { createClient } = await import('@/lib/supabase-client')
           const supabase = createClient()
 
           try {
-            console.log('🔄 Updating category in database:', {
-              user_id: dbUser.id,
-              old_name: oldName,
-              new_name: newName,
+            console.log('🔄 [onUpdateCategory] Updating category:', {
+              oldName,
+              newName,
               emoji,
             })
 
+            const updateData: any = { name: newName }
+
+            if (emoji !== undefined) {
+              updateData.emoji = emoji
+            }
+
+            // ✅ Removed isPublic handling - always public
+
             const { error: categoryError } = await supabase
               .from('categories')
-              .update({
-                name: newName,
-                emoji: emoji,
-              })
+              .update(updateData)
               .eq('user_id', dbUser.id)
               .eq('name', oldName)
 
             if (categoryError) {
-              console.error(
-                '❌ Supabase error updating category:',
-                categoryError,
-              )
+              console.error('❌ Category update error:', categoryError)
               throw categoryError
             }
 
             if (oldName !== newName) {
               const { error: bookmarkError } = await supabase
                 .from('bookmarks')
-                .update({
-                  category_name: newName,
-                })
+                .update({ category_name: newName })
                 .eq('user_id', dbUser.id)
                 .eq('category_name', oldName)
 
               if (bookmarkError) {
-                console.error(
-                  '❌ Supabase error updating bookmarks:',
-                  bookmarkError,
-                )
+                console.error('❌ Bookmark update error:', bookmarkError)
                 throw bookmarkError
               }
             }
 
-            console.log('✅ Category updated successfully in database')
+            console.log('✅ Category updated successfully')
           } catch (error) {
             console.error('❌ Error updating category:', error)
             throw error
@@ -176,12 +178,6 @@ export default function BookmarkManager() {
             const bookmark =
               bookmarkData.categories[categoryName][bookmarkIndex]
 
-            console.log('🗑️ Deleting bookmark from database:', {
-              user_id: dbUser.id,
-              site_name: bookmark.siteName,
-              category_name: categoryName,
-            })
-
             const { error } = await supabase
               .from('bookmarks')
               .delete()
@@ -189,14 +185,36 @@ export default function BookmarkManager() {
               .eq('site_name', bookmark.siteName)
               .eq('category_name', categoryName)
 
-            if (error) {
-              console.error('❌ Supabase error:', error)
-              throw error
-            }
-
-            console.log('✅ Bookmark deleted successfully from database')
+            if (error) throw error
           } catch (error) {
             console.error('❌ Error deleting bookmark:', error)
+            throw error
+          }
+        }
+      : undefined,
+    onDeleteCategory: dbUser?.id
+      ? async (categoryName) => {
+          const { createClient } = await import('@/lib/supabase-client')
+          const supabase = createClient()
+
+          try {
+            const { error: bookmarkError } = await supabase
+              .from('bookmarks')
+              .delete()
+              .eq('user_id', dbUser.id)
+              .eq('category_name', categoryName)
+
+            if (bookmarkError) throw bookmarkError
+
+            const { error: categoryError } = await supabase
+              .from('categories')
+              .delete()
+              .eq('user_id', dbUser.id)
+              .eq('name', categoryName)
+
+            if (categoryError) throw categoryError
+          } catch (error) {
+            console.error('❌ Error deleting category:', error)
             throw error
           }
         }
@@ -210,11 +228,6 @@ export default function BookmarkManager() {
             const oldBookmark =
               bookmarkData.categories[categoryName][bookmarkIndex]
 
-            console.log('🔄 Updating bookmark in database:', {
-              old: oldBookmark,
-              new: newData,
-            })
-
             const { error } = await supabase
               .from('bookmarks')
               .update({
@@ -226,63 +239,50 @@ export default function BookmarkManager() {
               .eq('site_name', oldBookmark.siteName)
 
             if (error) throw error
-
-            console.log('✅ Bookmark updated in database')
           } catch (error) {
             console.error('❌ Error updating bookmark:', error)
             throw error
           }
         }
       : undefined,
-    onDeleteCategory: dbUser?.id
-      ? async (categoryName) => {
-          const { createClient } = await import('@/lib/supabase-client')
-          const supabase = createClient()
-
-          try {
-            console.log('🗑️ Deleting category and bookmarks from database:', {
-              user_id: dbUser.id,
-              category_name: categoryName,
-            })
-
-            const { error: bookmarkError } = await supabase
-              .from('bookmarks')
-              .delete()
-              .eq('user_id', dbUser.id)
-              .eq('category_name', categoryName)
-
-            if (bookmarkError) {
-              console.error(
-                '❌ Supabase error deleting bookmarks:',
-                bookmarkError,
-              )
-              throw bookmarkError
-            }
-
-            const { error: categoryError } = await supabase
-              .from('categories')
-              .delete()
-              .eq('user_id', dbUser.id)
-              .eq('name', categoryName)
-
-            if (categoryError) {
-              console.error(
-                '❌ Supabase error deleting category:',
-                categoryError,
-              )
-              throw categoryError
-            }
-
-            console.log(
-              '✅ Category and bookmarks deleted successfully from database',
-            )
-          } catch (error) {
-            console.error('❌ Error deleting category:', error)
-            throw error
-          }
-        }
-      : undefined,
   })
+
+  const handleEditBookmark = (
+    categoryName: string,
+    index: number,
+    bookmark: any,
+  ) => {
+    console.log('🖊️ [handleEditBookmark] Called:', {
+      categoryName,
+      index,
+      bookmark,
+    })
+    setEditingBookmark({ categoryName, index, bookmark })
+    setShowEditModal(true)
+  }
+
+  const handleSaveBookmark = async (newName: string, newUrl: string) => {
+    console.log('💾 [handleSaveBookmark] Saving:', { newName, newUrl })
+
+    if (editingBookmark) {
+      const success = await updateBookmark(
+        editingBookmark.categoryName,
+        editingBookmark.index,
+        { siteName: newName, siteURL: newUrl },
+      )
+
+      if (success) {
+        setEditingBookmark(null)
+        setShowEditModal(false)
+      }
+    }
+  }
+
+  const handleCloseEditModal = () => {
+    console.log('❌ [handleCloseEditModal] Closing')
+    setShowEditModal(false)
+    setEditingBookmark(null)
+  }
 
   useEffect(() => {
     const handleKeydown = (e: KeyboardEvent) => {
@@ -292,6 +292,9 @@ export default function BookmarkManager() {
       }
 
       if (e.key === 'Escape') {
+        if (showEditModal) {
+          handleCloseEditModal()
+        }
         Object.keys(modals).forEach((modalId) => {
           if (modals[modalId as keyof typeof modals]) {
             closeModal(modalId as keyof typeof modals)
@@ -307,7 +310,7 @@ export default function BookmarkManager() {
 
     document.addEventListener('keydown', handleKeydown)
     return () => document.removeEventListener('keydown', handleKeydown)
-  }, [modals, closeModal, showModal, addBookmark])
+  }, [modals, closeModal, showModal, addBookmark, showEditModal])
 
   if (authLoading) {
     return (
@@ -323,12 +326,22 @@ export default function BookmarkManager() {
     <div className="bookmark-manager">
       <header className="bookmark-header">
         <div className="header-container">
-          <h1>Bookmarks</h1>
-          <p>
+          <h1
+            style={{
+              fontSize: '2.5rem',
+              fontWeight: 600,
+              textAlign: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              margin: 0,
+            }}
+          >
             <i className="fa-regular fa-bookmark"></i>
-            Organize your favorite sites
+            Create categories to organise your links
             <i className="fa-regular fa-bookmark"></i>
-          </p>
+          </h1>
         </div>
       </header>
 
@@ -338,6 +351,7 @@ export default function BookmarkManager() {
             categories={Object.keys(bookmarkData.categories)}
             onSubmit={addBookmark}
             bookmarkData={bookmarkData}
+            onCreateCategory={() => showModal('categoryModal')}
           />
 
           <CategorySection
@@ -359,6 +373,8 @@ export default function BookmarkManager() {
             onReorderCategories={reorderCategories}
             editingCategory={editingCategory}
             onUpdateCategory={updateCategory}
+            onToggleVisibility={toggleCategoryVisibility}
+            onEditBookmark={handleEditBookmark}
           />
         </div>
       </main>
@@ -368,6 +384,7 @@ export default function BookmarkManager() {
         onClose={() => closeModal('errorModal')}
       />
 
+      {/* ✅ Removed currentPrivateCategoryCount and currentIsPublic props */}
       <CategoryModal
         show={modals.categoryModal}
         onClose={() => closeModal('categoryModal')}
@@ -402,6 +419,15 @@ export default function BookmarkManager() {
             ? bookmarkData.categories[deleteTarget]?.length || 0
             : 0
         }
+      />
+
+      <BookmarkEditModal
+        show={showEditModal}
+        onClose={handleCloseEditModal}
+        onSave={handleSaveBookmark}
+        currentName={editingBookmark?.bookmark?.siteName || ''}
+        currentUrl={editingBookmark?.bookmark?.siteURL || ''}
+        categoryName={editingBookmark?.categoryName || ''}
       />
 
       <Toast show={toast.show} message={toast.message} type={toast.type} />
