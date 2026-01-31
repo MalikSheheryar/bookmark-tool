@@ -496,7 +496,7 @@ export default function PublicProfilePage() {
                   </h2>
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <Bookmark className="w-4 h-4" />
-                    {bookmarks.length} bookmark
+                    {bookmarks.length} link
                     {bookmarks.length !== 1 ? 's' : ''}
                   </div>
                 </div>
