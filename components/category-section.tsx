@@ -212,10 +212,6 @@ function SortableCategoryItem({
           ) : (
             <span
               className="category-name"
-              onClick={(e) => {
-                e.stopPropagation()
-                onSetEditingName(categoryName)
-              }}
               onPointerDown={(e) => e.stopPropagation()}
             >
               {categoryName}
